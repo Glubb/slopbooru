@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }} - {{ thread.title }}</title>
+  <link id="theme-stylesheet" rel="stylesheet" href="/css/{{ initial_theme_css }}">
+  <style>
+    /* Larger board title */
+    h1 {
+      font-size: 2.0em;
+      margin: 0.1em 0;
+      text-align: center;
+    }
+
+    /* Thread title (acts like a subtitle on thread pages) */
+    h2 {
+      font-size: 1.5em;
+      margin: 0.3em 0 0.8em 0;
+    }
+
+    /* Center the reply form */
+    #replyform {
+      max-width: 600px;
+      margin: 20px auto;
+      text-align: left;
+    }
+
+    /* 4chan postContainer + replacedSideArrows (to match the pasted real HTML exactly) */
+    .postContainer {
+      position: relative;
+    }
+    .replacedSideArrows {
+      position: absolute;
+      left: 0;
+      top: 2px;
+      width: 16px;
+      text-align: center;
+      font-size: 10pt;
+      color: #999;
+    }
+    .replacedSideArrows a { color: #999; text-decoration: none; }
+    .postContainer.replyContainer .post.reply {
+      display: table;
+      padding: 2px;
+      margin-left: 20px;
+    }
+
+    .postContainer.replyContainer .post.reply .fileText {
+      margin-left: 20px;
+    }
+
+    .postContainer.replyContainer .post.reply .fileThumb {
+      margin-left: 20px;
+      margin-right: 20px;
+      margin-top: 3px;
+      margin-bottom: 5px;
+    }
+
+    .postContainer.opContainer .post.op {
+      margin-left: 0;
+      border: none;
+      background: none;
+    }
+
+    /* Ensure tight gap next to images even if /css/ stylesheet doesn't load in this dev setup */
+    .post .file {
+      float: left;
+      margin-right: 5px;
+      margin-bottom: 2px;
+    }
+    .post .fileText {
+      font-size: 9pt;
+      color: #800000;
+      display: block;
+      max-width: 140px;
+      word-break: break-all;
+      line-height: 1.1;
+    }
+    .post a.fileThumb {
+      display: inline-block;
+      text-decoration: none;
+    }
+
+    .post a.fileThumb img {
+      border: 1px solid #800000;
+      max-width: 125px;
+      max-height: 125px;
+      vertical-align: middle;
+    }
+
+    .post a.fileThumb img.expanded,
+    .fileThumb.expanded img {
+      max-width: none;
+      max-height: none;
+    }
+
+    .post.has-expanded-image .postInfo,
+    .post.has-expanded-image .postMessage {
+      clear: both;
+    }
+
+    .subject {
+      font-weight: bold;
+      display: block;
+    }
+
+    /* Quote/reply links like 4chan/vichan */
+    a.quotelink {
+      color: #D00;
+      text-decoration: none;
+    }
+    a.quotelink:hover {
+      color: #F00;
+    }
+    a.quotejs {
+      color: inherit;
+      text-decoration: none;
+    }
+    a.quotejs:hover {
+      text-decoration: underline;
+    }
+
+    /* Report button as icon */
+    #report-form button {
+      background: none;
+      border: 1px solid #888;
+      padding: 1px 3px;
+      cursor: pointer;
+      font-size: 14px;
+      vertical-align: middle;
+    }
+
+    /* Report icon in per-post reflink */
+    .reflink a[title*="Report"] {
+      font-size: 10pt;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+<p><a href="/">← Back to board</a></p>
+{% if subtitle %}<p style="text-align:center; color:#666; margin:-0.3em 0 0.5em 0; font-size:0.95em;">{{ subtitle }}</p>{% endif %}
+<h2>{{ thread.title or "Thread " ~ thread.thread }}</h2>
+
+{% for p in thread.posts %}
+  {% set post_no = p.num %}
+  {% if loop.first %}
+  <div class="postContainer opContainer" id="pc{{ thread.thread }}">
+    <div class="post op" id="p{{ post_no }}">
+  {% else %}
+  <div class="postContainer replyContainer" id="pc{{ p.num }}">
+    <div class="replacedSideArrows" id="sa{{ p.num }}">
+      <a class="hide-reply-button" href="javascript:;" title="Hide reply"><span class="fa fa-minus-square-o"></span></a>
+    </div>
+    <div class="post reply" id="p{{ p.num }}">
+  {% endif %}
+
+  {% if p.image %}
+    <div class="file">
+      <span class="fileText">
+        File: <a href="/{{ p.image }}" target="_blank">{{ p.image.split('/')[-1] }}</a>
+        ({{ p.size }} B, {{ p.width }}x{{ p.height }})
+      </span>
+      <br>
+      {% if p.thumbnail %}
+        <a class="fileThumb" href="/{{ p.image }}" target="_blank">
+          <img class="fileThumb" src="/{{ p.thumbnail }}" alt="{{ p.size }} B">
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <div class="postInfo desktop">
+    <a name="{{ post_no }}"></a>
+    {% if loop.first and thread.title %}
+    <span class="subject">{{ thread.title }}</span>
+    {% endif %}
+    <label>
+      <input type="checkbox" name="report" value="{{ thread.thread }},{{ p.num }}" form="report-form">
+      <span class="postername">{{ p.name }}</span>
+      {% if p.capcode %}
+        {{ p.capcode | safe }}
+      {% elif p.trip %}
+        <span class="postertrip">{{ p.trip }}</span>
+      {% endif %}
+      {{ p.date }}
+    </label>
+    <span class="postNum desktop"><a href="#p{{ post_no }}" rel="nofollow" title="Link to this post">No.</a><a href="javascript:quote('{{ post_no }}');" class="quotejs" rel="nofollow" title="Reply to this post">{{ post_no }}</a></span>
+    <span class="reflink">
+      <a href="/?task=report&thread={{ thread.thread }}&post={{ p.num }}" target="_blank" title="Report this post">🚩</a>
+    </span>
+  </div>
+
+  <blockquote class="postMessage" id="m{{ p.num }}">
+    {{ p.comment_html | safe }}
+  </blockquote>
+
+  {% if loop.first %}
+    </div>
+  </div>
+  {% else %}
+    </div>
+  </div>
+  {% endif %}
+{% endfor %}
+
+{% if mode != "blog" or blog_comments != "disabled" %}
+<hr>
+<form id="replyform" method="post" action="/?task=post" enctype="multipart/form-data">
+  <input type="hidden" name="thread" value="{{ thread.thread }}">
+  <input type="hidden" name="markup" value="waka">
+  <input type="text" name="email" style="display:none">
+  <input type="text" name="url" style="display:none">
+
+  <p>Name: <input name="field_a" value="{{ 'Admin' if is_admin and mode == 'blog' else '' }}"> Link: <input name="field_b"></p>
+  <p>Del. pass: <input type="password" name="password" size="10" placeholder="for later deletion"></p>
+  <p><textarea name="comment" rows="5" cols="60"></textarea></p>
+  {% if allow_images %}<p>File: <input type="file" name="file"></p>{% endif %}
+  {% if enable_captcha %}
+  <p>
+    <img src="data:image/png;base64,{{ captcha_image }}" alt="captcha" style="vertical-align: middle; border: 1px solid #ccc; margin-right: 6px;">
+    <input type="text" name="captcha" size="8" required placeholder="captcha" style="vertical-align: middle;">
+    <input type="hidden" name="captcha_token" value="{{ captcha_token }}">
+  </p>
+  {% endif %}
+  <p><button type="submit">{% if mode == "blog" %}Comment{% else %}Reply{% endif %}</button></p>
+</form>
+{% endif %}
+
+<!-- Report form using the report checkboxes above -->
+<form id="report-form" method="post" action="/?task=report" style="margin-top: 12px;">
+  <input type="hidden" name="thread" value="{{ thread.thread }}">
+  <p>
+    Report:
+    <input type="text" name="reason" placeholder="Reason (required)" required style="width: 300px;">
+    <button type="submit" title="Report selected posts">🚩</button>
+  </p>
+  <small style="color:#666;">Check the boxes next to posts you want to report.</small>
+</form>
+
+<p style="margin-top: 4px;">
+  <a href="/admin/thread/{{ thread.thread }}" target="_blank" title="Open moderation page for this thread">🛠️ Mod thread</a>
+  <small style="color:#666;">(admin)</small>
+</p>
+
+<!-- Theme Switcher - Bottom Right -->
+<div id="theme-switcher" style="position: fixed; bottom: 8px; right: 8px; background: #fff; border: 1px solid #888; padding: 4px 8px; font-size: 12px; z-index: 9999;">
+  <label>Theme:
+    <select id="theme-select" onchange="setTheme(this.value)">
+      <option value="burichan">Burichan</option>
+      <option value="yotsuba">Yotsuba</option>
+      <option value="futaba">Futaba</option>
+      <option value="photon">Photon</option>
+      <option value="gurochan">Gurochan</option>
+    </select>
+  </label>
+</div>
+
+<script src="/kareha.js"></script>
+<script>
+function setTheme(theme) {
+    const link = document.getElementById('theme-stylesheet');
+    link.href = '/css/' + theme + '.css';
+
+    // Save as cookie for 1 year
+    document.cookie = "wakabastyle=" + theme + ";path=/;max-age=31536000";
+}
+
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+}
+
+// Load saved theme on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const saved = getCookie('wakabastyle');
+    const link = document.getElementById('theme-stylesheet');
+    const select = document.getElementById('theme-select');
+    if (saved) {
+        link.href = '/css/' + saved + '.css';
+        if (select) select.value = saved;
+    } else if (link && select) {
+        // No cookie: sync select to whatever the initial default stylesheet is (burichan etc)
+        const current = link.href.split('/').pop().replace(/\.css.*$/, '');
+        if (current) select.value = current;
+    }
+});
+</script>
+
+</body>
+</html>

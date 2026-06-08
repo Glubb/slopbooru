@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block body %}
+<h1>{{ title }}</h1>
+
+{% if show_title_img %}
+  <img src="{{ title_img }}" alt="{{ title }}">
+{% endif %}
+
+<p>Welcome to the board. This is a minimal stub from the initial scaffolding.</p>
+
+<p>Mode: <strong>{{ board_mode }}</strong></p>
+<p>Threads displayed (config): {{ threads_displayed }}</p>
+
+<h2>Recent threads (stub)</h2>
+<ul>
+  {% for t in recent_threads %}
+    <li><a href="/{{ t.thread }}/">{{ t.title }}</a> ({{ t.post_count }} posts)</li>
+  {% else %}
+    <li><em>No threads yet. Post the first one!</em></li>
+  {% endfor %}
+</ul>
+
+<form method="post" action="/?task=post" enctype="multipart/form-data">
+  <p>
+    <label>Name: <input name="field_a" value="{{ anon_name }}"></label>
+    <label>Email/Link: <input name="field_b"></label>
+  </p>
+  {% if require_thread_title %}
+    <p><label>Subject: <input name="title" required></label></p>
+  {% endif %}
+  <p>
+    <textarea name="comment" rows="5" cols="60" placeholder="Comment"></textarea>
+  </p>
+  {% if allow_image_threads %}
+    <p><label>File: <input type="file" name="file"></label></p>
+  {% endif %}
+  {% if enable_captcha %}
+    <p><label>Captcha: <input name="captcha"> (stub)</label></p>
+  {% endif %}
+  <p>
+    <button type="submit">Post</button>
+  </p>
+</form>
+{% endblock %}

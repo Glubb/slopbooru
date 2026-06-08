@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Admin Dashboard - {{ title }}</title>
+  <link rel="stylesheet" href="/css/{{ initial_theme_css }}">
+  <style>
+    body { margin: 1em; font-family: sans-serif; }
+    .report { color: #c00; }
+    ul { line-height: 1.6; }
+    .actions { font-size: 0.9em; }
+  </style>
+</head>
+<body>
+<h1>Admin Dashboard</h1>
+{% if subtitle %}<p style="text-align:center; color:#666; margin-top:-0.5em;">{{ subtitle }}</p>{% endif %}
+<p>Logged in as admin. <a href="/">Back to board</a></p>
+
+{% if open_reports %}
+<h2 class="report">Open Reports</h2>
+<ul>
+{% for report in open_reports %}
+  <li>
+    <a href="/{{ report.thread }}/#{{ report.post }}" target="_blank">
+      Thread {{ report.thread }} / Post {{ report.post }}
+    </a> -
+    <strong>{{ report.reason | e }}</strong>
+    ({{ report.time_str }}) 
+    <a href="?action=report_handled&amp;index={{ loop.index0 }}&amp;csrf={{ csrf }}">Mark Handled</a>
+  </li>
+{% endfor %}
+</ul>
+{% else %}
+<p>No open reports.</p>
+{% endif %}
+
+<h2>Threads</h2>
+<ul>
+{% for t in threads %}
+  {% set status = [] %}
+  {% if t.closed %}{% set _ = status.append("Closed") %}{% endif %}
+  {% if t.permasage %}{% set _ = status.append("Permasaged") %}{% endif %}
+  {% set status_str = status | join(" | ") or "Normal" %}
+  <li>
+    <a href="/admin/thread/{{ t.thread }}?csrf={{ csrf }}">#{{ t.thread }} — {{ t.title or "Untitled" | e }}</a>
+    ({{ t.postcount }} posts) - {{ status_str }}
+    <span class="actions">
+      <a href="?action=close&amp;thread={{ t.thread }}&amp;state=1&amp;csrf={{ csrf }}">Close</a> |
+      <a href="?action=close&amp;thread={{ t.thread }}&amp;state=0&amp;csrf={{ csrf }}">Open</a> |
+      <a href="?action=permasage&amp;thread={{ t.thread }}&amp;state=1&amp;csrf={{ csrf }}">Permasage</a> |
+      <a href="?action=permasage&amp;thread={{ t.thread }}&amp;state=0&amp;csrf={{ csrf }}">Unpermasage</a>
+    </span>
+  </li>
+{% endfor %}
+</ul>
+
+<p><small>CSRF protected. Use the mod links from thread pages for detailed view.</small></p>
+</body>
+</html>

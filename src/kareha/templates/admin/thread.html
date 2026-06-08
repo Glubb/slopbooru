@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Mod Thread #{{ thread_id }} — {{ title | e }}</title>
+  <link rel="stylesheet" href="/css/{{ initial_theme_css }}">
+  <style>
+    body { margin: 12px; font-family: sans-serif; }
+    .mod-post { border: 1px solid #888; margin: 8px 0; padding: 6px; }
+    .mod-post.op { border-width: 2px; }
+    .mod-file { float: left; margin-right: 8px; max-width: 140px; }
+    .mod-file img { max-width: 125px; max-height: 125px; border: 1px solid #800; }
+    .mod-content { overflow: hidden; }
+    .mod-actions { clear: both; margin-top: 6px; font-size: 0.9em; }
+    .mod-actions a { margin-right: 8px; }
+    .poster-id { font-family: monospace; color: #666; }
+  </style>
+</head>
+<body>
+<h1>Moderating Thread #{{ thread_id }}</h1>
+{% if subtitle %}<p style="text-align:center; color:#666; margin-top:-0.5em;">{{ subtitle }}</p>{% endif %}
+<p><a href="/admin?csrf={{ csrf }}">← Back to admin dashboard</a></p>
+
+<h2>{{ title | e }}</h2>
+
+<p>
+  <strong>Status:</strong> {{ post_count }} posts | 
+  {% if closed %}Closed{% else %}Open{% endif %} | 
+  {% if permasage %}Permasaged{% else %}Normal{% endif %}
+  &nbsp;&nbsp;
+  <a href="?action=close&amp;thread={{ thread_id }}&amp;state={{ 0 if closed else 1 }}&amp;csrf={{ csrf }}">
+    {{ "Open" if closed else "Close" }} thread
+  </a> |
+  <a href="?action=permasage&amp;thread={{ thread_id }}&amp;state={{ 0 if permasage else 1 }}&amp;csrf={{ csrf }}">
+    {{ "Unpermasage" if permasage else "Permasage" }}
+  </a>
+</p>
+
+<hr>
+
+<form method="post" action="/admin/thread/{{ thread_id }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+
+<p>
+  <strong>Mass actions for selected posts:</strong>
+  <select name="mass_action">
+    <option value="delete_posts">Delete selected posts</option>
+    <option value="delete_files">Delete files from selected posts</option>
+    <option value="ban_ips">Ban IPs of selected posts</option>
+    <option value="ban_md5s">Permaban MD5s of selected images</option>
+  </select>
+  <button type="submit">Apply</button>
+  <small>(select posts below with checkboxes)</small>
+</p>
+
+{% for p in posts %}
+  {% set is_op = loop.first %}
+  <div class="mod-post{{ ' op' if is_op else '' }}" id="p{{ p.num }}">
+    <div>
+      <input type="checkbox" name="selected_posts" value="{{ p.num }}">
+      <strong>No.{{ p.num }}</strong>
+      {{ p.name | e }}{{ p.trip | e }} {{ p.date | e }}
+      {% if p.ip %}
+        <span style="color:#666; font-family:monospace;">IP: {{ p.ip }}</span>
+      {% endif %}
+      {% if p.poster_id %}
+        <span class="poster-id">[ID:{{ p.poster_id }}]</span>
+      {% endif %}
+      {% if p.capcode %}
+        {{ p.capcode | safe }}
+      {% endif %}
+    </div>
+
+    {% if p.image %}
+    <div class="mod-file">
+      <div class="fileText">
+        File: <a href="/{{ p.image }}" target="_blank">{{ p.image.split('/')[-1] | e }}</a>
+        ({{ p.size }} B {% if p.width %} {{ p.width }}×{{ p.height }}{% endif %})
+      </div>
+      <a href="/{{ p.image }}" target="_blank">
+        <img src="/{{ p.thumbnail or p.image }}" alt="thumb">
+      </a>
+    </div>
+    {% endif %}
+
+    <div class="mod-content">
+      {{ p.comment_html | safe }}
+    </div>
+
+    <div class="mod-actions">
+      <a href="?action=delete&amp;thread={{ thread_id }}&amp;post={{ p.num }}&amp;csrf={{ csrf }}">🗑️ Delete post</a>
+      <a href="?action=deletefile&amp;thread={{ thread_id }}&amp;post={{ p.num }}&amp;csrf={{ csrf }}">🖼️ Delete file only</a>
+      {% if p.md5 %}
+      <a href="?action=banmd5&amp;thread={{ thread_id }}&amp;post={{ p.num }}&amp;csrf={{ csrf }}">🚫 Permaban file (MD5)</a>
+      {% endif %}
+    </div>
+  </div>
+{% endfor %}
+
+</form>
+
+</body>
+</html>

@@ -1,0 +1,36 @@
+"""
+Example Kareha Python board configuration.
+
+Copy this file to your board directory as `config.py` and edit.
+You must set ADMIN_PASS and SECRET at minimum.
+"""
+
+# === REQUIRED ===
+ADMIN_PASS = "put a strong password here"
+SECRET = "put a long random string here - at least 32 chars, never reuse"
+
+# === OPTIONAL OVERRIDES (examples) ===
+# TITLE = "My Awesome Board"
+# SUBTITLE = "A subtitle for all pages"
+# DEFAULT_STYLE = "Futaba"
+# ENABLE_CAPTCHA = True
+# DISPLAY_ID = "ip"          # show randomized ID:xxxx next to posts from same IP
+# THREADS_DISPLAYED = 15
+# MAX_KB = 8192          # Max upload size in KB (8192 = 8 MB)
+
+# CAPPED_TRIPS: special trip codes that render as admin/mod capcodes instead of #trip
+# Format: 'raw_trip_or_computed_trip' -> 'HTML to display (e.g. ## Admin badge)'
+# Common pattern: use !!secret for "secure" trips (see TRIPKEY and SECRET).
+# CAPPED_TRIPS = {
+#     "!!myadminsecret": '<span class="capcode admin" title="Administrator">## Admin</span>',
+#     "#modsecret": '<span class="capcode mod" title="Moderator">## Mod</span>',
+# }
+
+# Board mode (hybrid: set here, or override with CLI / make_app arg).
+# BOARD_MODE = "imageboard"   # default - full images, grid catalog, classic layout
+# BOARD_MODE = "textboard"    # or "text" / "message" - text only, but still has grid catalog
+# BOARD_MODE = "blog"         # admin-only entries (via cookie), flat dated list + linear catalog,
+#                             # images allowed on entries (BLOG_COMMENTS controls comments)
+#
+# The explicit --mode flag to `kareha serve` (or mode= to make_app) always wins
+# over the value in this file. Aliases are accepted in either location.

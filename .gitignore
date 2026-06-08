@@ -1,0 +1,44 @@
+# User board configuration (contains secrets like ADMIN_PASS, SECRET, CAPPED_TRIPS, etc.)
+# Always use config.py.example as the template and create your own config.py
+/config.py
+
+# Python bytecode / cache
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+
+# Local test / development board instances
+blogboard/
+testboard/
+venv/
+env/
+ENV/
+
+# Board runtime data (when the project root or subdirs are used as boards)
+# Media uploads, thread storage, thumbnails
+res/
+thumb/
+
+# Root-level src/ is used for board image uploads in some setups.
+# We want to keep src/kareha (the Python package source) but ignore uploaded media.
+src/
+!src/kareha/
+
+# OS / editor noise
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+*.sublime-*
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# Distribution / packaging (if you build wheels/sdist)
+build/
+dist/
+*.egg-info/

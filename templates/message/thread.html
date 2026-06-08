@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ thread.title }} - {{ title }}</title>
+  <style>
+    body { font-family: sans-serif; background:#f5f5f5; margin:1em; }
+    .reply { background:white; padding:0.4em; margin-bottom:0.6em; border-left: 3px solid #888; }
+    form { background:#e8f0ff; padding:0.6em; margin-top:1em; }
+  </style>
+</head>
+<body>
+<p><a href="/">← Back to board</a></p>
+{% if subtitle %}<p style="text-align:center; color:#666; margin:-0.3em 0 0.5em 0; font-size:0.95em;">{{ subtitle }}</p>{% endif %}
+<h2>{{ thread.title or "Entry " ~ thread.thread }}</h2>
+
+{% for p in thread.posts %}
+<div class="reply">
+  <strong>No.{{ p.num }}</strong> {{ p.name }}{% if p.trip %}{{ p.trip }}{% endif %} {{ p.date }}<br>
+  {{ p.comment_html | safe }}
+</div>
+{% endfor %}
+
+<hr>
+<form method="post" action="/?task=post" enctype="multipart/form-data">
+  <input type="hidden" name="thread" value="{{ thread.thread }}">
+  <input type="hidden" name="markup" value="waka">
+  <!-- Honeypots (leave empty) -->
+  <input type="text" name="email" style="display:none">
+  <input type="text" name="url" style="display:none">
+
+  <p><input name="field_a" value="{{ 'Admin' if is_admin and mode == 'blog' else '' }}" placeholder="Name"> <input name="field_b" placeholder="Link"></p>
+  <p><textarea name="comment" rows="5" cols="70"></textarea></p>
+  <p><button type="submit">{% if mode == "blog" %}Comment{% else %}Reply{% endif %}</button></p>
+</form>
+
+<p>
+  <a href="/admin/thread/{{ thread.thread }}" target="_blank">🛠️ Mod thread</a>
+  <small>(admin)</small>
+</p>
+
+</body>
+</html>

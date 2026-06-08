@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }}</title>
+  <link id="theme-stylesheet" rel="stylesheet" href="/css/{{ initial_theme_css }}">
+  <style>
+    /* Board title - larger and prominent */
+    h1 {
+      font-size: 2.4em;
+      margin: 0.2em 0 0.4em 0;
+      text-align: center;
+    }
+
+    /* Center the new post form */
+    #postform {
+      max-width: 600px;
+      margin: 0 auto 20px auto;
+      text-align: left;
+    }
+
+    /* Visual separation between threads (OP posts) */
+    .thread {
+      margin-bottom: 20px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #aaa;
+      clear: both;
+      overflow: hidden;   /* contains any floated images inside this thread block so the separator line and next OP start cleanly underneath (not beside the previous thumb) */
+    }
+
+    /* Remove border on the very last thread */
+    .thread:last-child {
+      border-bottom: none;
+      margin-bottom: 8px;
+    }
+
+    /* Classic 4chan: thumb left (float), text starts beside it.
+       Long text in .postMessage continues naturally under the thumb on the left side
+       (no forced narrow column). Matches the desired "next to image then down on left". */
+    .post .file {
+      float: left;
+      margin-right: 5px;   /* tighter gap between thumb+filetext and the post text, closer to real 4chan */
+      margin-bottom: 2px;
+    }
+
+    /* no general .post bg to prevent white/light rects around floated thumbs; OP uses its own */
+
+
+    .post .postInfo {
+      overflow: hidden;  /* short header stays clean */
+    }
+    /* .postMessage: natural float wrapping (text goes down on left below image) */
+
+    .post .fileText {
+      max-width: 140px;
+      word-break: break-all;
+      line-height: 1.1;
+    }
+
+    /* Front page grouping: replies indented under their OP (OP Post > reply reply reply)
+       inside each .thread. Next thread's OP resets to left edge. */
+    .thread .post.reply {
+      margin-left: 6px;   /* light visual grouping under the OP without messing up the thread separator lines */
+    }
+
+    /* 4chan postContainer + side arrows structure (matches pasted real HTML) */
+    .postContainer {
+      position: relative;
+    }
+    .replacedSideArrows {
+      position: absolute;
+      left: 0;
+      top: 2px;
+      width: 16px;
+      text-align: center;
+      font-size: 10pt;
+      color: #999;
+    }
+    .replacedSideArrows a { color: #999; text-decoration: none; }
+    .postContainer.replyContainer .post.reply {
+      display: table;
+      padding: 2px;
+      margin-left: 20px;
+    }
+
+    .postContainer.replyContainer .post.reply .fileText {
+      margin-left: 20px;
+    }
+
+    .postContainer.replyContainer .post.reply .fileThumb {
+      margin-left: 20px;
+      margin-right: 20px;
+      margin-top: 3px;
+      margin-bottom: 5px;
+    }
+
+    .postContainer.opContainer .post.op {
+      margin-left: 0;
+      border: none;
+      background: none;
+    }
+
+    a.fileThumb img.expanded,
+    .fileThumb.expanded img {
+      max-width: none;
+      max-height: none;
+    }
+
+    .post.has-expanded-image .postInfo,
+    .post.has-expanded-image .postMessage {
+      clear: both;
+    }
+
+    .subject {
+      font-weight: bold;
+      display: block;
+    }
+
+    /* Quote/reply links like 4chan/vichan */
+    a.quotelink {
+      color: #D00;
+      text-decoration: none;
+    }
+    a.quotelink:hover {
+      color: #F00;
+    }
+    a.quotejs {
+      color: inherit;
+      text-decoration: none;
+    }
+    a.quotejs:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+<h1>{{ title }}</h1>
+{% if subtitle %}<p style="text-align:center; color:#666; margin:0 0 0.5em 0; font-size:1.1em;">{{ subtitle }}</p>{% endif %}
+<p style="text-align:center; font-size:10pt; margin: 4px 0 12px;">[<a href="/">Index</a>]{% if mode == "imageboard" %} [<a href="/catalog">Catalog</a>]{% endif %}</p>
+
+{% if error %}<p style="color:red"><strong>Error:</strong> {{ error }}</p>{% endif %}
+
+<form id="postform" method="post" action="/?task=post" enctype="multipart/form-data">
+  <input type="hidden" name="markup" value="waka">
+  <!-- Honeypots for spam (leave these empty) -->
+  <input type="text" name="email" style="display:none">
+  <input type="text" name="url" style="display:none">
+
+  <p>
+    Name: <input name="field_a" value="{{ 'Admin' if is_admin and mode == 'blog' else anon_name }}">
+    Link: <input name="field_b">
+  </p>
+  {% if require_title or mode == "blog" %}
+    <p>Subject: <input name="title" required></p>
+  {% endif %}
+  <p>Del. pass: <input type="password" name="password" size="10" placeholder="optional for deletion"></p>
+  <p><textarea name="comment" rows="6" cols="70" placeholder="Comment"></textarea></p>
+  {% if allow_images %}
+    <p>File: <input type="file" name="file"></p>
+  {% endif %}
+  {% if enable_captcha %}
+  <p>
+    <img src="data:image/png;base64,{{ captcha_image }}" alt="captcha" style="vertical-align: middle; border: 1px solid #ccc; margin-right: 6px;">
+    <input type="text" name="captcha" size="8" required placeholder="captcha" style="vertical-align: middle;">
+    <input type="hidden" name="captcha_token" value="{{ captcha_token }}">
+  </p>
+  {% endif %}
+  <p><button type="submit">{% if mode == "blog" %}Post Entry{% else %}Post{% endif %}</button></p>
+</form>
+
+{% for t in threads %}
+<div class="thread">
+  <!-- OP Post wrapped like real 4chan -->
+  <div class="postContainer opContainer" id="pc{{ t.thread }}">
+    <div class="post op" id="p{{ t.op.num }}">
+      {% if t.op.image %}
+        <div class="file">
+          <span class="fileText">
+            File: <a href="/{{ t.op.image }}" target="_blank">{{ t.op.image.split('/')[-1] }}</a>
+            ({{ t.op.size }} B, {{ t.op.width }}x{{ t.op.height }})
+          </span>
+          <br>
+          {% if t.op.thumbnail %}
+            <a class="fileThumb" href="/{{ t.op.image }}" target="_blank">
+              <img class="fileThumb" src="/{{ t.op.thumbnail }}" alt="{{ t.op.size }} B">
+            </a>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div class="postInfo desktop">
+        <a name="{{ t.op.num }}"></a>
+        {% if t.title %}
+        <span class="subject">{{ t.title }}</span>
+        {% endif %}
+        <span class="postername">{{ t.op.name }}</span>
+        {% if t.op.capcode %}
+          {{ t.op.capcode | safe }}
+        {% elif t.op.trip %}
+          <span class="postertrip">{{ t.op.trip }}</span>
+        {% endif %}
+        {{ t.op.date }}
+        <span class="reflink">
+          <a href="/{{ t.thread }}/#{{ t.op.num }}">No.{{ t.op.num }}</a>
+        </span>
+        <span class="replylink">[<a href="/{{ t.thread }}/">{% if mode == "blog" %}Comment{% else %}Reply{% endif %}</a>]</span>
+      </div>
+
+      <blockquote class="postMessage" id="m{{ t.op.num }}">
+        {{ t.op.comment_html | safe }}
+      </blockquote>
+
+      {% if t.omitted > 0 %}
+        <div class="omitted">
+          {{ t.omitted }} posts omitted. <a href="/{{ t.thread }}/">Click here</a> to view.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Replies wrapped exactly like real 4chan (with side arrows for visual indent/grouping) -->
+  {% for r in t.replies %}
+  <div class="postContainer replyContainer" id="pc{{ r.num }}">
+    <div class="replacedSideArrows" id="sa{{ r.num }}">
+      <a class="hide-reply-button" href="javascript:;" title="Hide reply"><span class="fa fa-minus-square-o"></span></a>
+    </div>
+    <div class="post reply" id="p{{ r.num }}">
+      {% if r.image %}
+        <div class="file">
+          <span class="fileText">
+            File: <a href="/{{ r.image }}">{{ r.image.split('/')[-1] }}</a>
+          </span>
+          <br>
+          {% if r.thumbnail %}
+            <a class="fileThumb" href="/{{ r.image }}" target="_blank">
+              <img class="fileThumb" src="/{{ r.thumbnail }}" alt="{{ r.size }} B" style="max-width:125px; max-height:125px;">
+            </a>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div class="postInfo desktop">
+        <a name="{{ r.num }}"></a>
+        <span class="postername">{{ r.name }}</span>
+        {% if r.capcode %}
+          {{ r.capcode | safe }}
+        {% elif r.trip %}
+          <span class="postertrip">{{ r.trip }}</span>
+        {% endif %}
+        {{ r.date }}
+        <span class="reflink">
+          <a href="/{{ t.thread }}/#{{ r.num }}">No.{{ r.num }}</a>
+        </span>
+      </div>
+
+      <blockquote class="postMessage" id="m{{ r.num }}">
+        {{ r.comment_html | safe }}
+      </blockquote>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p>No threads yet. Be the first to post!</p>
+{% endfor %}
+
+<!-- Theme Switcher - Bottom Right -->
+<div id="theme-switcher" style="position: fixed; bottom: 8px; right: 8px; background: #fff; border: 1px solid #888; padding: 4px 8px; font-size: 12px; z-index: 9999;">
+  <label>Theme:
+    <select id="theme-select" onchange="setTheme(this.value)">
+      <option value="burichan">Burichan</option>
+      <option value="yotsuba">Yotsuba</option>
+      <option value="futaba">Futaba</option>
+      <option value="photon">Photon</option>
+      <option value="gurochan">Gurochan</option>
+    </select>
+  </label>
+</div>
+
+<script src="/kareha.js"></script>
+<script>
+function setTheme(theme) {
+    const link = document.getElementById('theme-stylesheet');
+    link.href = '/css/' + theme + '.css';
+    document.cookie = "wakabastyle=" + theme + ";path=/;max-age=31536000";
+}
+
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const saved = getCookie('wakabastyle');
+    const link = document.getElementById('theme-stylesheet');
+    const select = document.getElementById('theme-select');
+    if (saved) {
+        link.href = '/css/' + saved + '.css';
+        if (select) select.value = saved;
+    } else if (link && select) {
+        // No cookie: sync select to whatever the initial default stylesheet is (burichan etc)
+        const current = link.href.split('/').pop().replace(/\.css.*$/, '');
+        if (current) select.value = current;
+    }
+});
+</script>
+
+</body>
+</html>
