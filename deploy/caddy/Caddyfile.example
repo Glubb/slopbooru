@@ -1,61 +1,84 @@
-# Example Caddyfile for multiple Slopbooru boards under subpaths on one domain.
-# Customize domain, board names, ports, and root paths.
-# Place this in your Caddy config (e.g. /etc/caddy/Caddyfile) and reload with `caddy reload`.
+# Super generic Caddyfile example for Slopbooru (kareha) boards mounted under subpaths.
+#
+# IMPORTANT:
+# - Replace placeholders: YOUR_DOMAIN, /path/to/main-site, /path/to/slopbooru/YOURBOARD, YOUR_PORT, /yourboard/
+# - The URL prefix you choose in the handle (e.g. /ad/* ) **must** match the `base_path='/ad'`
+#   you pass to make_app() in your gunicorn/systemd service for that board.
+# - For static assets (css, src, thumb) we use handle_path + root pointing to the *specific subdirectory*.
+#   This ensures Caddy serves the .css files with the correct Content-Type so that
+#   X-Content-Type-Options: nosniff does not block them.
+# - No hard-coded real paths or board names are present in this example.
+# - Place in /etc/caddy/Caddyfile (or use import) and run `caddy reload` (or `systemctl reload caddy`).
+#
+# After any change to base_path in your service or this file, restart the board's gunicorn
+# and reload Caddy.
 
-example.com {
+YOUR_DOMAIN {
+    # Recommended security headers (good defaults for imageboard/blog)
     header Permissions-Policy "interest-cohort=()"
+    header X-Content-Type-Options "nosniff"
+    header Referrer-Policy "same-origin"
+    # header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"  # enable once stable on HTTPS
 
-    # Main static site (served from a separate directory)
-    root * /home/websites/main-site
-    file_server browse
+    # === Your main site / front page (completely separate from boards) ===
+    root * /path/to/your/main-site
+    file_server
 
-    # Example board 1: blog mode under /board1/
-    handle /board1/* {
-        # Serve static assets directly from the board dir for performance
-        handle_path /board1/src/* {
-            root * /home/websites/slopbooru/board1
+    # === One board mounted under a subpath, e.g. /yourboard/ or /ad/ ===
+    # Example: if you want the board at https://YOUR_DOMAIN/ad/ then use:
+    #   handle /ad/* { ... }
+    #   and in your gunicorn service: base_path='/ad'
+    #   and point the static roots below to your actual board directory on disk.
+    handle /yourboard/* {
+        # Static assets - IMPORTANT: root must point to the leaf directory (the css/ folder itself etc.)
+        # because handle_path strips the prefix, leaving only the filename part.
+        handle_path /yourboard/src/* {
+            root * /path/to/slopbooru/YOURBOARD/src
             file_server
         }
-        handle_path /board1/thumb/* {
-            root * /home/websites/slopbooru/board1
+        handle_path /yourboard/thumb/* {
+            root * /path/to/slopbooru/YOURBOARD/thumb
             file_server
         }
-        handle_path /board1/css/* {
-            root * /home/websites/slopbooru/board1
+        handle_path /yourboard/css/* {
+            root * /path/to/slopbooru/YOURBOARD/css
             file_server
         }
 
-        # Proxy dynamic requests (and the board's dynamic pages like /board1/admin, /board1/123 etc)
-        # We use handle_path here so the *prefix is stripped* for the backend; the app still
-        # uses base_path (passed to make_app) to generate correct script_root for links, forms,
-        # cookies and redirects (so browser requests come back with /board1/... and match the
-        # outer handle). The python code is also tolerant of receiving the full prefixed path
-        # (in case you prefer plain `handle /board1/* { reverse_proxy }` without _path).
-        handle_path /board1/* {
-            reverse_proxy 127.0.0.1:8001
+        # All dynamic requests for this board (/, /catalog, /123/, /admin, /admin/thread/..., posting, etc.)
+        # are proxied. handle_path strips /yourboard so the WSGI app sees clean paths like /admin .
+        # The app uses the base_path you configured to generate correct outgoing links/cookies/redirects.
+        handle_path /yourboard/* {
+            reverse_proxy 127.0.0.1:YOUR_PORT
         }
     }
 
-    # Example board 2: imageboard mode under /board2/
-    handle /board2/* {
-        handle_path /board2/src/* {
-            root * /home/websites/slopbooru/board2
-            file_server
-        }
-        handle_path /board2/thumb/* {
-            root * /home/websites/slopbooru/board2
-            file_server
-        }
-        handle_path /board2/css/* {
-            root * /home/websites/slopbooru/board2
-            file_server
-        }
+    # Repeat the handle block for additional boards.
+    # Each board needs:
+    #   - its own subdirectory under slopbooru/ (with its own config.py, res/, css/, etc.)
+    #   - its own gunicorn port
+    #   - its own base_path in the make_app() call that matches the handle prefix
+    #
+    # Example concrete block you can adapt for a board at /ad/ (replace paths and port):
+    #
+    # handle /ad/* {
+    #     handle_path /ad/src/* {
+    #         root * /path/to/slopbooru/ad/src
+    #         file_server
+    #     }
+    #     handle_path /ad/thumb/* {
+    #         root * /path/to/slopbooru/ad/thumb
+    #         file_server
+    #     }
+    #     handle_path /ad/css/* {
+    #         root * /path/to/slopbooru/ad/css
+    #         file_server
+    #     }
+    #     handle_path /ad/* {
+    #         reverse_proxy 127.0.0.1:8000
+    #     }
+    # }
 
-        handle_path /board2/* {
-            reverse_proxy 127.0.0.1:8002
-        }
-    }
-
-    # Add more boards as needed. Use different ports in gunicorn services.
-    # For each board, run a separate systemd service with its own port and base_path.
+    # No redirects for bare /admin or similar are included.
+    # Only the prefixed path (e.g. /ad/admin) should reach a board's admin interface.
 }

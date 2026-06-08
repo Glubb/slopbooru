@@ -246,15 +246,23 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                 return resp
 
             if not is_admin:
-                return Response(
+                login_html = (
+                    "<!doctype html><html><head><meta charset='utf-8'>"
+                    f"<title>Admin Login - {html_escape(getattr(cfg, 'TITLE', 'Board'))}</title>"
+                    "</head><body>"
                     "<h1>Admin Login</h1>"
                     f'<form method="post" action="{script_root}/admin">'
                     'Admin Pass: <input type="password" name="admin" autocomplete="current-password">'
                     '<button type="submit">Login</button>'
                     "</form>"
-                    "<p><small><!-- Auth via HttpOnly cookie + CSRF on actions --></small></p>",
-                    mimetype="text/html",
+                    "<p><small>Authenticated via HttpOnly cookie after login. "
+                    "Use the same password you configured as ADMIN_PASS.</small></p>"
+                    "</body></html>"
                 )
+                resp = Response(login_html, mimetype="text/html")
+                resp.headers["X-Content-Type-Options"] = "nosniff"
+                resp.headers["Referrer-Policy"] = "same-origin"
+                return resp
 
             csrf = request.cookies.get("admin_csrf", "")
 
@@ -281,7 +289,10 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                 except Exception as e:
                     # For debugging template errors, show the real exception
                     html = f"<h1>Admin Dashboard</h1><p>Admin template error: {e}</p><pre>{traceback.format_exc()}</pre>"
-                return Response(html, mimetype="text/html")
+                resp = Response(html, mimetype="text/html")
+                resp.headers["X-Content-Type-Options"] = "nosniff"
+                resp.headers["Referrer-Policy"] = "same-origin"
+                return resp
 
             # Per-thread mod page via Jinja template (item 2). Shows the IP-based unique poster_id.
             if effective_path.startswith("/admin/thread/"):
@@ -342,7 +353,10 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                     )
                 except Exception as e:
                     html = f"<h1>Mod #{thread_id}</h1><p>Admin thread template error: {e}</p><pre>{traceback.format_exc()}</pre>"
-                return Response(html, mimetype="text/html")
+                resp = Response(html, mimetype="text/html")
+                resp.headers["X-Content-Type-Options"] = "nosniff"
+                resp.headers["Referrer-Policy"] = "same-origin"
+                return resp
 
             # Handle admin actions (item 1: basic CSRF via query for current links)
             action = request.args.get("action")
