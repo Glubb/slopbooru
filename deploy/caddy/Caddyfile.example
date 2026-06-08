@@ -1,0 +1,57 @@
+# Example Caddyfile for multiple Slopbooru boards under subpaths on one domain.
+# Customize domain, board names, ports, and root paths.
+# Place this in your Caddy config (e.g. /etc/caddy/Caddyfile) and reload with `caddy reload`.
+
+example.com {
+    header Permissions-Policy "interest-cohort=()"
+
+    # Main static site (served from a separate directory)
+    root * /home/websites/main-site
+    file_server browse
+
+    # Example board 1: blog mode under /board1/
+    handle /board1/* {
+        # Serve static assets directly from the board dir for performance
+        handle_path /board1/src/* {
+            root * /home/websites/slopbooru/board1
+            file_server
+        }
+        handle_path /board1/thumb/* {
+            root * /home/websites/slopbooru/board1
+            file_server
+        }
+        handle_path /board1/css/* {
+            root * /home/websites/slopbooru/board1
+            file_server
+        }
+
+        # Proxy dynamic requests to gunicorn (full path preserved so the app's
+        # base_path handling works; app strips prefix internally for routing)
+        handle_path /board1/* {
+            reverse_proxy 127.0.0.1:8001
+        }
+    }
+
+    # Example board 2: imageboard mode under /board2/
+    handle /board2/* {
+        handle_path /board2/src/* {
+            root * /home/websites/slopbooru/board2
+            file_server
+        }
+        handle_path /board2/thumb/* {
+            root * /home/websites/slopbooru/board2
+            file_server
+        }
+        handle_path /board2/css/* {
+            root * /home/websites/slopbooru/board2
+            file_server
+        }
+
+        handle_path /board2/* {
+            reverse_proxy 127.0.0.1:8002
+        }
+    }
+
+    # Add more boards as needed. Use different ports in gunicorn services.
+    # For each board, run a separate systemd service with its own port and base_path.
+}

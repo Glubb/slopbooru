@@ -1,0 +1,36 @@
+[Unit]
+Description=Slopbooru {{BOARD_NAME}} ({{MODE}} mode)
+After=network.target
+
+[Service]
+Type=simple
+User=websites
+Group=websites
+WorkingDirectory=/home/websites/slopbooru/
+
+# Ensure logs dir exists and has correct ownership before starting
+ExecStartPre=/bin/mkdir -p /home/websites/slopbooru/logs
+ExecStartPre=/bin/chown -R websites:websites /home/websites/slopbooru/logs
+
+# Production launch with gunicorn (recommended over the built-in dev server)
+# Customize --workers, --bind port (use different port per board if running multiple),
+# and the make_app call with your board_dir, mode, and base_path for subpath support.
+ExecStart=/home/websites/slopbooru/venv/bin/gunicorn \
+    --workers 4 \
+    --bind 127.0.0.1:{{PORT}} \
+    --access-logfile /home/websites/slopbooru/logs/{{BOARD_NAME}}-access.log \
+    --error-logfile /home/websites/slopbooru/logs/{{BOARD_NAME}}-error.log \
+    --log-level info \
+    --preload \
+    "kareha.wsgi:make_app(board_dir='/home/websites/slopbooru/{{BOARD_NAME}}', mode='{{MODE}}', base_path='/{{BOARD_NAME}}')"
+
+Restart=always
+RestartSec=5
+SyslogIdentifier=slopbooru-{{BOARD_NAME}}
+
+# Optional resource limits for small VPS
+# MemoryMax=512M
+# CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target
