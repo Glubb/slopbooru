@@ -42,3 +42,6 @@ src/
 build/
 dist/
 *.egg-info/
+
+# Personal deployment systemd units (for user's server)
+systemd/

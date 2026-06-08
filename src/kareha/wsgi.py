@@ -135,15 +135,35 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
             script_root = "/" + script_root
         script_root = script_root.rstrip("/")
 
-        # effective_path is the path relative to this board's mount point (for routing)
-        # Always strip base_path first if present in the path (handles Caddy handle_path stripping or full prefix)
-        # Then additionally strip script_root if still present (for proper WSGI SCRIPT_NAME cases)
-        req_path = request.path
+        # effective_path is the path relative to this board's mount point (for routing).
+        # Robust against Caddy variations: handle /board/* (passes full /board/admin to backend)
+        # vs handle_path /board/* (strips to /admin for backend), SCRIPT_NAME, explicit base_path,
+        # double slashes, trailing slashes etc. We try all candidate prefixes.
+        req_path = request.path or "/"
+        candidates = []
+        for cand in (request.environ.get("SCRIPT_NAME", ""), base_path, script_root):
+            if cand:
+                c = cand.rstrip("/")
+                if c and c not in candidates:
+                    candidates.append(c)
         effective_path = req_path
-        if base_path and effective_path.startswith(base_path):
-            effective_path = effective_path[len(base_path):] or "/"
-        if script_root and effective_path.startswith(script_root):
-            effective_path = effective_path[len(script_root):] or "/"
+        for pfx in candidates:
+            if pfx and effective_path.startswith(pfx):
+                effective_path = effective_path[len(pfx):] or "/"
+                break
+        # Extra tolerance + collapse duplicate slashes (some proxies/Caddy configs can emit //)
+        if base_path:
+            bp = base_path.rstrip("/")
+            if bp and bp in effective_path and not effective_path.startswith("/"):
+                # attempt to recover inner path if prefix somehow partially remained
+                idx = effective_path.find(bp)
+                if idx != -1:
+                    after = effective_path[idx + len(bp):]
+                    if after.startswith("/") or after == "":
+                        effective_path = after or "/"
+        effective_path = "/" + (effective_path or "").lstrip("/")
+        while "//" in effective_path:
+            effective_path = effective_path.replace("//", "/")
 
         # Public CSRF token for posting forms (separate from admin_csrf; cookie-based for stateless "session")
         public_csrf = ""
@@ -168,7 +188,35 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
         # === ADMIN INTERFACE ===
         # Uses cookie-based auth (preferred) to avoid leaking the password in URLs/logs/history.
         # Falls back to one-time ?admin= or form value only for the login step itself.
-        if effective_path.startswith("/admin"):
+        # Extra defensive checks on raw_path + candidates so /ad/admin (or equivalent under base_path)
+        # works reliably no matter what path transformation the fronting Caddy (handle vs handle_path)
+        # applied before proxying to gunicorn.
+        raw_path = req_path
+        enter_admin = effective_path.startswith("/admin")
+        if not enter_admin:
+            for pfx in candidates + [base_path]:
+                if pfx:
+                    p = pfx.rstrip("/")
+                    if (raw_path.startswith(p + "/admin") or raw_path == (p + "/admin") or
+                            raw_path.startswith(p + "/admin/")):
+                        enter_admin = True
+                        break
+        if not enter_admin and "/admin" in raw_path:
+            if base_path or script_root:
+                enter_admin = True
+
+        if enter_admin:
+            # Force a clean effective_path (strip any remaining prefix) so the inner
+            # == "/admin", startswith("/admin/thread/"), logout etc all see the canonical form.
+            for pfx in candidates + [base_path, script_root]:
+                if pfx:
+                    p = pfx.rstrip("/")
+                    if effective_path.startswith(p):
+                        effective_path = effective_path[len(p):] or "/"
+            effective_path = "/" + (effective_path or "").lstrip("/")
+            while "//" in effective_path:
+                effective_path = effective_path.replace("//", "/")
+
             # Handle explicit login POST first (sets the cookie)
             if request.method == "POST":
                 provided = (request.form.get("admin") or "").strip()

@@ -25,8 +25,12 @@ example.com {
             file_server
         }
 
-        # Proxy dynamic requests to gunicorn (full path preserved so the app's
-        # base_path handling works; app strips prefix internally for routing)
+        # Proxy dynamic requests (and the board's dynamic pages like /board1/admin, /board1/123 etc)
+        # We use handle_path here so the *prefix is stripped* for the backend; the app still
+        # uses base_path (passed to make_app) to generate correct script_root for links, forms,
+        # cookies and redirects (so browser requests come back with /board1/... and match the
+        # outer handle). The python code is also tolerant of receiving the full prefixed path
+        # (in case you prefer plain `handle /board1/* { reverse_proxy }` without _path).
         handle_path /board1/* {
             reverse_proxy 127.0.0.1:8001
         }

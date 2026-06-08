@@ -187,7 +187,7 @@
           <br>
           {% if t.op.thumbnail %}
             <a class="fileThumb" href="{{ script_root }}/{{ t.op.image }}" target="_blank">
-              <img class="fileThumb" src="/{{ t.op.thumbnail }}" alt="{{ t.op.size }} B">
+              <img class="fileThumb" src="{{ script_root }}/{{ t.op.thumbnail }}" alt="{{ t.op.size }} B">
             </a>
           {% endif %}
         </div>
@@ -238,7 +238,7 @@
           <br>
           {% if r.thumbnail %}
             <a class="fileThumb" href="{{ script_root }}/{{ r.image }}" target="_blank">
-              <img class="fileThumb" src="/{{ r.thumbnail }}" alt="{{ r.size }} B" style="max-width:125px; max-height:125px;">
+              <img class="fileThumb" src="{{ script_root }}/{{ r.thumbnail }}" alt="{{ r.size }} B" style="max-width:125px; max-height:125px;">
             </a>
           {% endif %}
         </div>
@@ -254,7 +254,7 @@
         {% endif %}
         {{ r.date }}
         <span class="reflink">
-          <a href="/{{ t.thread }}/#{{ r.num }}">No.{{ r.num }}</a>
+          <a href="{{ script_root }}/{{ t.thread }}/#{{ r.num }}">No.{{ r.num }}</a>
         </span>
       </div>
 
@@ -286,8 +286,8 @@
 <script>
 function setTheme(theme) {
     const link = document.getElementById('theme-stylesheet');
-    link.href = '/css/' + theme + '.css';
-    document.cookie = "wakabastyle=" + theme + ";path=/;max-age=31536000";
+    link.href = '{{ script_root }}/css/' + theme + '.css';
+    document.cookie = "wakabastyle=" + theme + ";path={{ script_root or '/' }};max-age=31536000";
 }
 
 function getCookie(name) {
@@ -302,7 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const link = document.getElementById('theme-stylesheet');
     const select = document.getElementById('theme-select');
     if (saved) {
-        link.href = '/css/' + saved + '.css';
+        link.href = '{{ script_root }}/css/' + saved + '.css';
         if (select) select.value = saved;
     } else if (link && select) {
         // No cookie: sync select to whatever the initial default stylesheet is (burichan etc)

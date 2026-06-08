@@ -16,10 +16,10 @@
 {% if subtitle %}<p style="text-align:center; color:#666; margin:0 0 0.5em 0; font-size:1.1em;">{{ subtitle }}</p>{% endif %}
 
 <p class="nav">
-  <a href="/">Refresh</a>
-  {% if mode in ("imageboard", "textboard") %} | <a href="/catalog">Catalog</a>{% endif %}
+  <a href="{{ script_root or '/' }}">Refresh</a>
+  {% if mode in ("imageboard", "textboard") %} | <a href="{{ script_root }}/catalog">Catalog</a>{% endif %}
   {% if mode != "blog" and mode != "textboard" %}
-  | <a href="/?mode=imageboard">Switch to Imageboard</a>
+  | <a href="{{ script_root }}/?mode=imageboard">Switch to Imageboard</a>
   {% endif %}
 </p>
 
@@ -46,7 +46,7 @@
 <h2>{% if mode == "blog" %}Entries{% else %}Threads{% endif %}</h2>
 {% for t in threads %}
 <div class="thread">
-  <strong><a href="/{{ t.thread }}/">{{ t.title or "Untitled" }}</a></strong>
+  <strong><a href="{{ script_root }}/{{ t.thread }}/">{{ t.title or "Untitled" }}</a></strong>
   <span style="color:#666">({{ t.postcount }} posts)</span>
 
   <!-- Show first few replies inline (simplified 2ch style) -->

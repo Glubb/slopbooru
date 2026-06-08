@@ -173,8 +173,8 @@
     {% for t in threads %}
     <article class="blog-entry" id="t{{ t.thread }}">
       {% if t.op.image and t.op.thumbnail %}
-      <a href="/{{ t.thread }}/" class="blog-thumb">
-        <img src="/{{ t.op.thumbnail }}" alt="thumb">
+      <a href="{{ script_root }}/{{ t.thread }}/" class="blog-thumb">
+        <img src="{{ script_root }}/{{ t.op.thumbnail }}" alt="thumb">
       </a>
       {% endif %}
       <div style="overflow:hidden;">
@@ -183,7 +183,7 @@
         {% if t.title %}
           <h2 class="blog-title"><a href="{{ script_root }}/{{ t.thread }}/">{{ t.title }}</a></h2>
         {% else %}
-          <h2 class="blog-title"><a href="/{{ t.thread }}/">Untitled entry</a></h2>
+          <h2 class="blog-title"><a href="{{ script_root }}/{{ t.thread }}/">Untitled entry</a></h2>
         {% endif %}
 
         <div class="blog-meta">
@@ -218,7 +218,7 @@
     <div class="thread" id="t{{ t.thread }}">
       {% if t.op.image and t.op.thumbnail %}
         <a href="{{ script_root }}/{{ t.thread }}/" class="thumb">
-          <img src="/{{ t.op.thumbnail }}" class="catalog-thumb" alt="thumb">
+          <img src="{{ script_root }}/{{ t.op.thumbnail }}" class="catalog-thumb" alt="thumb">
         </a>
       {% else %}
         <span class="no-thumb">No image</span>
@@ -259,8 +259,8 @@
 <script>
 function setTheme(theme) {
     const link = document.getElementById('theme-stylesheet');
-    link.href = '/css/' + theme + '.css';
-    document.cookie = "wakabastyle=" + theme + ";path=/;max-age=31536000";
+    link.href = '{{ script_root }}/css/' + theme + '.css';
+    document.cookie = "wakabastyle=" + theme + ";path={{ script_root or '/' }};max-age=31536000";
 }
 
 function getCookie(name) {
@@ -275,7 +275,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const link = document.getElementById('theme-stylesheet');
     const select = document.getElementById('theme-select');
     if (saved) {
-        link.href = '/css/' + saved + '.css';
+        link.href = '{{ script_root }}/css/' + saved + '.css';
         if (select) select.value = saved;
     } else if (link && select) {
         // No cookie: sync select to whatever the initial default stylesheet is (burichan etc)

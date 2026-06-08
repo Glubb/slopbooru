@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Admin Dashboard - {{ title }}</title>
-  <link rel="stylesheet" href="/css/{{ initial_theme_css }}">
+  <link rel="stylesheet" href="{{ script_root }}/css/{{ initial_theme_css }}">
   <style>
     body { margin: 1em; font-family: sans-serif; }
     .report { color: #c00; }
@@ -21,7 +21,7 @@
 <ul>
 {% for report in open_reports %}
   <li>
-    <a href="/{{ report.thread }}/#{{ report.post }}" target="_blank">
+    <a href="{{ script_root }}/{{ report.thread }}/#{{ report.post }}" target="_blank">
       Thread {{ report.thread }} / Post {{ report.post }}
     </a> -
     <strong>{{ report.reason | e }}</strong>

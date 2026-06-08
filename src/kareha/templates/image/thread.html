@@ -164,7 +164,7 @@
       <br>
       {% if p.thumbnail %}
         <a class="fileThumb" href="{{ script_root }}/{{ p.image }}" target="_blank">
-          <img class="fileThumb" src="/{{ p.thumbnail }}" alt="{{ p.size }} B">
+          <img class="fileThumb" src="{{ script_root }}/{{ p.thumbnail }}" alt="{{ p.size }} B">
         </a>
       {% endif %}
     </div>
@@ -261,10 +261,10 @@
 <script>
 function setTheme(theme) {
     const link = document.getElementById('theme-stylesheet');
-    link.href = '/css/' + theme + '.css';
+    link.href = '{{ script_root }}/css/' + theme + '.css';
 
     // Save as cookie for 1 year
-    document.cookie = "wakabastyle=" + theme + ";path=/;max-age=31536000";
+    document.cookie = "wakabastyle=" + theme + ";path={{ script_root or '/' }};max-age=31536000";
 }
 
 function getCookie(name) {
@@ -280,7 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const link = document.getElementById('theme-stylesheet');
     const select = document.getElementById('theme-select');
     if (saved) {
-        link.href = '/css/' + saved + '.css';
+        link.href = '{{ script_root }}/css/' + saved + '.css';
         if (select) select.value = saved;
     } else if (link && select) {
         // No cookie: sync select to whatever the initial default stylesheet is (burichan etc)

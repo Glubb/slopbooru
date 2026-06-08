@@ -10,7 +10,7 @@
   </style>
 </head>
 <body>
-<p><a href="/">← Back to board</a></p>
+<p><a href="{{ script_root or '/' }}">← Back to board</a></p>
 {% if subtitle %}<p style="text-align:center; color:#666; margin:-0.3em 0 0.5em 0; font-size:0.95em;">{{ subtitle }}</p>{% endif %}
 <h2>{{ thread.title or "Entry " ~ thread.thread }}</h2>
 
@@ -45,7 +45,7 @@
 {% endif %}
 
 <p>
-  <a href="/admin/thread/{{ thread.thread }}" target="_blank">🛠️ Mod thread</a>
+  <a href="{{ script_root }}/admin/thread/{{ thread.thread }}" target="_blank">🛠️ Mod thread</a>
   <!-- (admin only) -->
 </p>
 
