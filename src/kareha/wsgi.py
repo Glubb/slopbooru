@@ -136,11 +136,14 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
         script_root = script_root.rstrip("/")
 
         # effective_path is the path relative to this board's mount point (for routing)
+        # Always strip base_path first if present in the path (handles Caddy handle_path stripping or full prefix)
+        # Then additionally strip script_root if still present (for proper WSGI SCRIPT_NAME cases)
         req_path = request.path
-        if script_root and req_path.startswith(script_root):
-            effective_path = req_path[len(script_root):] or "/"
-        else:
-            effective_path = req_path
+        effective_path = req_path
+        if base_path and effective_path.startswith(base_path):
+            effective_path = effective_path[len(base_path):] or "/"
+        if script_root and effective_path.startswith(script_root):
+            effective_path = effective_path[len(script_root):] or "/"
 
         # Public CSRF token for posting forms (separate from admin_csrf; cookie-based for stateless "session")
         public_csrf = ""
