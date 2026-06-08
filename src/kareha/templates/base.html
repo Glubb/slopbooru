@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <title>{% block title %}{{ title }}{% endblock %} - Kareha</title>
-  <link rel="stylesheet" href="/css/{{ default_style|lower|replace(' ', '_') }}.css">
-  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="stylesheet" href="{{ script_root | default('') }}/css/{{ default_style|lower|replace(' ', '_') }}.css">
+  <link rel="shortcut icon" href="{{ script_root | default('') }}/favicon.ico">
   {% block head %}{% endblock %}
 </head>
 <body>

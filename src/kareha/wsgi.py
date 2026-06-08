@@ -56,7 +56,7 @@ def _check_rate_limit(ip: str, cfg: Any) -> bool:
     return True
 
 
-def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrides: Any):
+def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: str = "", **cfg_overrides: Any):
     """
     Factory that returns a WSGI application for a specific board.
 
@@ -66,6 +66,11 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
           - If provided, it takes precedence over BOARD_MODE in the board's config.py.
           - If None (or omitted), the value of BOARD_MODE from config.py is used (or "imageboard").
           - Aliases are accepted in either place: "image", "text", "message", "blog", etc.
+
+    base_path: Optional URL prefix for this board when mounted under a subpath (e.g. "/board1").
+               Used for generating links and handling requests when not behind a prefix-stripping
+               dispatcher. When using DispatcherMiddleware or a proxy that sets SCRIPT_NAME,
+               the app will prefer SCRIPT_NAME.
 
     The final canonical BOARD_MODE ("imageboard", "textboard", or "blog") ends up on the
     config object and drives image policy, front-page layout, catalog style, blog admin
@@ -94,6 +99,14 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
     from . import config as config_module
     config_module.current_config = cfg
 
+    # Normalize base_path for subpath mounting (e.g. "/board1")
+    base_path = (base_path or "").strip()
+    if base_path and not base_path.startswith("/"):
+        base_path = "/" + base_path
+    base_path = base_path.rstrip("/")
+    if base_path == "":
+        base_path = ""
+
     # Compute initial theme CSS from DEFAULT_STYLE (so changing the default in config affects new users / no-cookie case)
     default_style_name = getattr(cfg, "DEFAULT_STYLE", "Burichan")
     initial_theme_css = default_style_name.lower().replace(" ", "_") + ".css"
@@ -115,6 +128,19 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
         task = request.args.get("task") or request.form.get("task")
         error = None
         is_admin = get_admin_auth(request, cfg)
+
+        # Support subpath mounting via explicit base_path or SCRIPT_NAME (from DispatcherMiddleware etc.)
+        script_root = request.environ.get("SCRIPT_NAME", "") or base_path or ""
+        if script_root and not script_root.startswith("/"):
+            script_root = "/" + script_root
+        script_root = script_root.rstrip("/")
+
+        # effective_path is the path relative to this board's mount point (for routing)
+        req_path = request.path
+        if script_root and req_path.startswith(script_root):
+            effective_path = req_path[len(script_root):] or "/"
+        else:
+            effective_path = req_path
 
         # Public CSRF token for posting forms (separate from admin_csrf; cookie-based for stateless "session")
         public_csrf = ""
@@ -139,14 +165,14 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
         # === ADMIN INTERFACE ===
         # Uses cookie-based auth (preferred) to avoid leaking the password in URLs/logs/history.
         # Falls back to one-time ?admin= or form value only for the login step itself.
-        if request.path.startswith("/admin"):
+        if effective_path.startswith("/admin"):
             # Handle explicit login POST first (sets the cookie)
             if request.method == "POST":
                 provided = (request.form.get("admin") or "").strip()
                 if provided and check_admin_pass(provided, cfg):
                     token = create_admin_token(cfg)
                     csrf_token = __import__("secrets").token_urlsafe(16)
-                    resp = Response(status=303, headers={"Location": "/admin"})
+                    resp = Response(status=303, headers={"Location": script_root + "/admin"})
                     # Secure cookie handling (item 4)
                     admin_secure = getattr(cfg, "ADMIN_COOKIE_SECURE", False)
                     if not admin_secure:
@@ -155,22 +181,23 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                         if scheme == "https" or xfp == "https":
                             admin_secure = True
 
-                    resp.set_cookie("admin_auth", token, httponly=True, secure=admin_secure, samesite="Lax", max_age=86400, path="/")
-                    resp.set_cookie("admin_csrf", csrf_token, httponly=True, samesite="Lax", max_age=86400, path="/")
+                    cookie_path = script_root + "/" if script_root else "/"
+                    resp.set_cookie("admin_auth", token, httponly=True, secure=admin_secure, samesite="Lax", max_age=86400, path=cookie_path)
+                    resp.set_cookie("admin_csrf", csrf_token, httponly=True, samesite="Lax", max_age=86400, path=cookie_path)
                     return resp
 
             is_admin = get_admin_auth(request, cfg)
 
-            if request.path == "/admin/logout":
-                resp = Response(status=303, headers={"Location": "/"})
-                resp.set_cookie("admin_auth", "", expires=0, path="/")
-                resp.set_cookie("admin_csrf", "", expires=0, path="/")
+            if effective_path == "/admin/logout":
+                resp = Response(status=303, headers={"Location": script_root + "/"})
+                resp.set_cookie("admin_auth", "", expires=0, path=script_root + "/" if script_root else "/")
+                resp.set_cookie("admin_csrf", "", expires=0, path=script_root + "/" if script_root else "/")
                 return resp
 
             if not is_admin:
                 return Response(
                     "<h1>Admin Login</h1>"
-                    '<form method="post" action="/admin">'
+                    f'<form method="post" action="{script_root}/admin">'
                     'Admin Pass: <input type="password" name="admin" autocomplete="current-password">'
                     '<button type="submit">Login</button>'
                     "</form>"
@@ -181,7 +208,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
             csrf = request.cookies.get("admin_csrf", "")
 
             # Thread list via Jinja template (item 2) + CSRF (item 1) + thread # in template
-            if request.path == "/admin" or request.path == "/admin/":
+            if effective_path == "/admin" or effective_path == "/admin/":
                 threads = get_all_threads_for_admin(board_dir, cfg)
 
                 import time
@@ -198,6 +225,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                         threads=threads,
                         csrf=csrf,
                         enumerate=enumerate,  # in case any template still uses it
+                        script_root=script_root,
                     )
                 except Exception as e:
                     # For debugging template errors, show the real exception
@@ -205,9 +233,9 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                 return Response(html, mimetype="text/html")
 
             # Per-thread mod page via Jinja template (item 2). Shows the IP-based unique poster_id.
-            if request.path.startswith("/admin/thread/"):
+            if effective_path.startswith("/admin/thread/"):
                 try:
-                    thread_id = int(request.path.split("/admin/thread/")[1].split("?")[0])
+                    thread_id = int(effective_path.split("/admin/thread/")[1].split("?")[0])
                 except Exception:
                     return Response("Bad thread id", status=400)
 
@@ -244,7 +272,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                                     if p.md5:
                                         ban_md5(board_dir, p.md5, reason=f"Mass ban from mod page thread {thread_id}", cfg=cfg)
                             save_thread(thread, res_dir)
-                        return Response(status=303, headers={"Location": f"/admin/thread/{thread_id}?csrf={csrf}"})
+                        return Response(status=303, headers={"Location": f"{script_root}/admin/thread/{thread_id}?csrf={csrf}"})
 
                 try:
                     tmpl = jinja_env.get_template("admin/thread.html")
@@ -259,6 +287,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                         post_count=len(thread.posts),
                         csrf=csrf,
                         enumerate=enumerate,
+                        script_root=script_root,
                     )
                 except Exception as e:
                     html = f"<h1>Mod #{thread_id}</h1><p>Admin thread template error: {e}</p><pre>{traceback.format_exc()}</pre>"
@@ -334,9 +363,9 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                     pass
 
             # Redirect
-            location = "/admin"
+            location = script_root + "/admin"
             if thread_id_str and action in ("close", "permasage", "delete", "deletefile", "banmd5"):
-                location = f"/admin/thread/{thread_id_str}"
+                location = f"{script_root}/admin/thread/{thread_id_str}"
             return Response(status=303, headers={"Location": location})
 
         # === DELETION (basic) ===
@@ -437,7 +466,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
             form_html = f"""
             <html><body>
             <h2>Report Post #{safe_pid} in thread #{safe_tid}</h2>
-            <form method="post" action="/?task=report">
+            <form method="post" action="{script_root}/?task=report">
                 <input type="hidden" name="thread" value="{safe_tid}">
                 <input type="hidden" name="post" value="{safe_pid}">
                 <p>Reason for report:</p>
@@ -561,12 +590,12 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
 
                 # Redirect to front or thread; set delpass cookie so it's "married" to user's session/cookie for future convenience
                 if request.form.get("thread"):
-                    loc = f"/{request.form['thread']}/"
+                    loc = f"{script_root}/{request.form['thread']}/"
                 else:
-                    loc = "/"
+                    loc = script_root + "/"
                 resp = Response(status=303, headers={"Location": loc})
                 if del_password:
-                    resp.set_cookie("delpass", del_password, httponly=True, samesite="Lax", max_age=86400*365, path="/")
+                    resp.set_cookie("delpass", del_password, httponly=True, samesite="Lax", max_age=86400*365, path=script_root + "/" if script_root else "/")
                 return resp
 
             except Exception as e:
@@ -610,6 +639,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                         captcha_image=captcha_image,
                         csrf_token=public_csrf,
                         default_delpass=default_delpass,
+                        script_root=script_root,
                     )
                     resp = Response(html, mimetype="text/html")
                     if not request.cookies.get("csrf_token"):
@@ -624,7 +654,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                 pass
 
         # === FRONT PAGE ===
-        if request.path in ("/", "/index.html"):
+        if effective_path in ("/", "/index.html"):
             from .core.storage import list_threads as list_t, load_thread
             res_dir = board_dir / getattr(cfg, "RES_DIR", "res/")
             bmode = getattr(cfg, "BOARD_MODE", "imageboard")
@@ -711,12 +741,13 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                 is_admin=is_admin,
                 csrf_token=public_csrf,
                 default_delpass=default_delpass,
+                script_root=script_root,
             )
             resp = Response(html, mimetype="text/html")
             if not request.cookies.get("csrf_token"):
-                resp.set_cookie("csrf_token", public_csrf, httponly=True, samesite="Lax", max_age=86400*30, path="/")
+                resp.set_cookie("csrf_token", public_csrf, httponly=True, samesite="Lax", max_age=86400*30, path=script_root + "/" if script_root else "/")
             if newly_created_delpass:
-                resp.set_cookie("delpass", default_delpass, httponly=True, samesite="Lax", max_age=86400*365, path="/")
+                resp.set_cookie("delpass", default_delpass, httponly=True, samesite="Lax", max_age=86400*365, path=script_root + "/" if script_root else "/")
             resp.headers["X-Content-Type-Options"] = "nosniff"
             resp.headers["Referrer-Policy"] = "same-origin"
             return resp
@@ -724,7 +755,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
         # === CATALOG VIEW ===
         # imageboard / textboard: classic 4chan-style grid (thumbnails or "No image" + short teasers, lasthit order)
         # blog: linear blog-style list with dates, titles, excerpts (newest first by creation)
-        if request.path.rstrip("/") in ("/catalog", "/catalog.html"):
+        if effective_path.rstrip("/") in ("/catalog", "/catalog.html"):
             bmode = getattr(cfg, "BOARD_MODE", "imageboard")
             if bmode not in ("imageboard", "textboard", "blog"):
                 return Response("Catalog is only available in imageboard, textboard, and blog modes.", status=404)
@@ -794,12 +825,13 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                 blog_comments=blog_comments,
                 initial_theme_css=initial_theme_css,
                 default_style=default_style_name,
+                script_root=script_root,
             )
             return Response(html, mimetype="text/html")
 
         # === THREAD VIEW ===
         # Match /12345/ or /12345
-        m = re.match(r"^/(\d+)", request.path)
+        m = re.match(r"^/(\d+)", effective_path)
         if m:
             thread_id = int(m.group(1))
             from .core.storage import load_thread
@@ -846,12 +878,13 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                 blog_comments=blog_comments,
                 csrf_token=public_csrf,
                 default_delpass=default_delpass,
+                script_root=script_root,
             )
             resp = Response(html, mimetype="text/html")
             if not request.cookies.get("csrf_token"):
-                resp.set_cookie("csrf_token", public_csrf, httponly=True, samesite="Lax", max_age=86400*30, path="/")
+                resp.set_cookie("csrf_token", public_csrf, httponly=True, samesite="Lax", max_age=86400*30, path=script_root + "/" if script_root else "/")
             if newly_created_delpass:
-                resp.set_cookie("delpass", default_delpass, httponly=True, samesite="Lax", max_age=86400*365, path="/")
+                resp.set_cookie("delpass", default_delpass, httponly=True, samesite="Lax", max_age=86400*365, path=script_root + "/" if script_root else "/")
             resp.headers["X-Content-Type-Options"] = "nosniff"
             resp.headers["Referrer-Policy"] = "same-origin"
             return resp

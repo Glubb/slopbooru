@@ -17,13 +17,13 @@
 <h2>Recent threads (stub)</h2>
 <ul>
   {% for t in recent_threads %}
-    <li><a href="/{{ t.thread }}/">{{ t.title }}</a> ({{ t.post_count }} posts)</li>
+    <li><a href="{{ script_root | default('') }}/{{ t.thread }}/">{{ t.title }}</a> ({{ t.post_count }} posts)</li>
   {% else %}
     <li><em>No threads yet. Post the first one!</em></li>
   {% endfor %}
 </ul>
 
-<form method="post" action="/?task=post" enctype="multipart/form-data">
+<form method="post" action="{{ script_root | default('') }}/?task=post" enctype="multipart/form-data">
   <p>
     <label>Name: <input name="field_a" value="{{ anon_name }}"></label>
     <label>Email/Link: <input name="field_b"></label>

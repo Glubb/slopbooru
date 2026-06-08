@@ -26,7 +26,7 @@
 {% if error %}<p style="color:red">{{ error }}</p>{% endif %}
 
 <!-- New thread form -->
-<form method="post" action="/?task=post" enctype="multipart/form-data">
+<form method="post" action="{{ script_root | default('') }}/?task=post" enctype="multipart/form-data">
   <input type="hidden" name="markup" value="waka">
   <input type="hidden" name="csrf" value="{{ csrf_token | default('') }}">
   <!-- Honeypots (leave empty) -->

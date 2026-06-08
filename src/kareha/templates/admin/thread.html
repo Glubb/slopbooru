@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Mod Thread #{{ thread_id }} — {{ title | e }}</title>
-  <link rel="stylesheet" href="/css/{{ initial_theme_css }}">
+  <link rel="stylesheet" href="{{ script_root }}/css/{{ initial_theme_css }}">
   <style>
     body { margin: 12px; font-family: sans-serif; }
     .mod-post { border: 1px solid #888; margin: 8px 0; padding: 6px; }
@@ -19,7 +19,7 @@
 <body>
 <h1>Moderating Thread #{{ thread_id }}</h1>
 {% if subtitle %}<p style="text-align:center; color:#666; margin-top:-0.5em;">{{ subtitle }}</p>{% endif %}
-<p><a href="/admin?csrf={{ csrf }}">← Back to admin dashboard</a> | <a href="/admin/logout">Logout</a></p>
+<p><a href="{{ script_root }}/admin?csrf={{ csrf }}">← Back to admin dashboard</a> | <a href="{{ script_root }}/admin/logout">Logout</a></p>
 
 <h2>{{ title | e }}</h2>
 
@@ -38,7 +38,7 @@
 
 <hr>
 
-<form method="post" action="/admin/thread/{{ thread_id }}">
+<form method="post" action="{{ script_root }}/admin/thread/{{ thread_id }}">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 
 <p>
@@ -74,11 +74,11 @@
     {% if p.image %}
     <div class="mod-file">
       <div class="fileText">
-        File: <a href="/{{ p.image }}" target="_blank">{{ p.image.split('/')[-1] | e }}</a>
+        File: <a href="{{ script_root }}/{{ p.image }}" target="_blank">{{ p.image.split('/')[-1] | e }}</a>
         ({{ p.size }} B {% if p.width %} {{ p.width }}×{{ p.height }}{% endif %})
       </div>
-      <a href="/{{ p.image }}" target="_blank">
-        <img src="/{{ p.thumbnail or p.image }}" alt="thumb">
+      <a href="{{ script_root }}/{{ p.image }}" target="_blank">
+        <img src="{{ script_root }}/{{ p.thumbnail or p.image }}" alt="thumb">
       </a>
     </div>
     {% endif %}

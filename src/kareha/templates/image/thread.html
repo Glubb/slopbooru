@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>{{ title }} - {{ thread.title }}</title>
-  <link id="theme-stylesheet" rel="stylesheet" href="/css/{{ initial_theme_css }}">
+  <link id="theme-stylesheet" rel="stylesheet" href="{{ script_root }}/css/{{ initial_theme_css }}">
   <style>
     /* Larger board title */
     h1 {
@@ -138,7 +138,7 @@
   </style>
 </head>
 <body>
-<p><a href="/">← Back to board</a></p>
+<p><a href="{{ script_root }}/">← Back to board</a></p>
 {% if subtitle %}<p style="text-align:center; color:#666; margin:-0.3em 0 0.5em 0; font-size:0.95em;">{{ subtitle }}</p>{% endif %}
 <h2>{{ thread.title or "Thread " ~ thread.thread }}</h2>
 
@@ -158,12 +158,12 @@
   {% if p.image %}
     <div class="file">
       <span class="fileText">
-        File: <a href="/{{ p.image }}" target="_blank">{{ p.image.split('/')[-1] }}</a>
+        File: <a href="{{ script_root }}/{{ p.image }}" target="_blank">{{ p.image.split('/')[-1] }}</a>
         ({{ p.size }} B, {{ p.width }}x{{ p.height }})
       </span>
       <br>
       {% if p.thumbnail %}
-        <a class="fileThumb" href="/{{ p.image }}" target="_blank">
+        <a class="fileThumb" href="{{ script_root }}/{{ p.image }}" target="_blank">
           <img class="fileThumb" src="/{{ p.thumbnail }}" alt="{{ p.size }} B">
         </a>
       {% endif %}
@@ -187,7 +187,7 @@
     </label>
     <span class="postNum desktop"><a href="#p{{ post_no }}" rel="nofollow" title="Link to this post">No.</a><a href="javascript:quote('{{ post_no }}');" class="quotejs" rel="nofollow" title="Reply to this post">{{ post_no }}</a></span>
     <span class="reflink">
-      <a href="/?task=report&thread={{ thread.thread }}&post={{ p.num }}" target="_blank" title="Report this post">🚩</a>
+      <a href="{{ script_root }}/?task=report&thread={{ thread.thread }}&post={{ p.num }}" target="_blank" title="Report this post">🚩</a>
     </span>
   </div>
 
@@ -206,7 +206,7 @@
 
 {% if mode != "blog" or blog_comments != "disabled" %}
 <hr>
-<form id="replyform" method="post" action="/?task=post" enctype="multipart/form-data">
+<form id="replyform" method="post" action="{{ script_root }}/?task=post" enctype="multipart/form-data">
   <input type="hidden" name="thread" value="{{ thread.thread }}">
   <input type="hidden" name="markup" value="waka">
   <input type="hidden" name="csrf" value="{{ csrf_token }}">
@@ -229,7 +229,7 @@
 {% endif %}
 
 <!-- Report form using the report checkboxes above -->
-<form id="report-form" method="post" action="/?task=report" style="margin-top: 12px;">
+<form id="report-form" method="post" action="{{ script_root }}/?task=report" style="margin-top: 12px;">
   <input type="hidden" name="thread" value="{{ thread.thread }}">
   <p>
     Report:
@@ -240,7 +240,7 @@
 </form>
 
 <p style="margin-top: 4px;">
-  <a href="/admin/thread/{{ thread.thread }}" target="_blank" title="Open moderation page for this thread">🛠️ Mod thread</a>
+  <a href="{{ script_root }}/admin/thread/{{ thread.thread }}" target="_blank" title="Open moderation page for this thread">🛠️ Mod thread</a>
   <!-- (admin only) -->
 </p>
 
@@ -257,7 +257,7 @@
   </label>
 </div>
 
-<script src="/kareha.js"></script>
+<script src="{{ script_root }}/kareha.js"></script>
 <script>
 function setTheme(theme) {
     const link = document.getElementById('theme-stylesheet');

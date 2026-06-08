@@ -17,6 +17,13 @@ import nh3
 
 from .utils import REPLY_RANGE_RE, url_regexp
 
+# Cross-board quote: >>>/boardname/1234 or >>>boardname/1234
+CROSS_BOARD_QUOTE_RE = re.compile(
+    r'(?<![\x80-\x9f\xe0-\xfc])(?:&gt;&gt;&gt;|>>>)'
+    r'\s*/?\s*([a-zA-Z0-9_-]+)\s*/\s*(\d+)',
+    re.I
+)
+
 __all__ = [
     "format_comment",
     "do_wakabamark",
@@ -60,6 +67,11 @@ def format_comment(comment: str, markup: str, thread: str, allowed_html: dict | 
 
 def wakabamark_format(text: str, thread: str) -> str:
     text = _clean_and_decode(text)
+    # Cross-board quotes first (they produce <a> that should survive processing)
+    text = CROSS_BOARD_QUOTE_RE.sub(
+        lambda m: f'<a href="/{m.group(1)}/{m.group(2)}/" class="quotelink" rel="nofollow">&gt;&gt;&gt;/{m.group(1)}/{m.group(2)}</a>',
+        text
+    )
     # Hide >> references (both raw and entity form) so they survive the quote parser
     text = re.sub(r"(?:&gt;&gt;|>>)(" + REPLY_RANGE_RE.pattern + ")", "&gtgt;\\1", text, flags=re.I)
 
@@ -226,6 +238,11 @@ def do_spans(handler: Callable[[str], str] | None, *lines: str) -> str:
 
 def simple_format(text: str, thread: str) -> str:
     text = _clean_and_decode(text)
+    # Cross-board quotes first (root-absolute to other boards)
+    text = CROSS_BOARD_QUOTE_RE.sub(
+        lambda m: f'<a href="/{m.group(1)}/{m.group(2)}/" class="quotelink" rel="nofollow">&gt;&gt;&gt;/{m.group(1)}/{m.group(2)}</a>',
+        text
+    )
     # >> references (accept both raw and entity form)
     text = re.sub(
         r"(?:&gt;&gt;|>>)(" + REPLY_RANGE_RE.pattern + r")",
@@ -245,6 +262,11 @@ def aa_format(text: str, thread: str) -> str:
 def html_format(text: str, thread: str, allowed: dict | None = None) -> str:
     text = _clean_and_decode(text)
     text = sanitize_html(text, allowed or {})
+    # Cross-board quotes (after sanitize so the <a> survives if allowed, or is added post)
+    text = CROSS_BOARD_QUOTE_RE.sub(
+        lambda m: f'<a href="/{m.group(1)}/{m.group(2)}/" class="quotelink" rel="nofollow">&gt;&gt;&gt;/{m.group(1)}/{m.group(2)}</a>',
+        text
+    )
     # Still allow >> links even in html mode
     text = re.sub(
         r"&gt;&gt;(" + REPLY_RANGE_RE.pattern + r")",
@@ -259,6 +281,11 @@ def html_format(text: str, thread: str, allowed: dict | None = None) -> str:
 def raw_html_format(text: str, thread: str, allowed: dict | None = None) -> str:
     text = _clean_and_decode(text)
     text = sanitize_html(text, allowed or {})
+    # Cross-board quotes
+    text = CROSS_BOARD_QUOTE_RE.sub(
+        lambda m: f'<a href="/{m.group(1)}/{m.group(2)}/" class="quotelink" rel="nofollow">&gt;&gt;&gt;/{m.group(1)}/{m.group(2)}</a>',
+        text
+    )
     # collapse whitespace like original
     text = re.sub(r"\s+", " ", text)
     return text

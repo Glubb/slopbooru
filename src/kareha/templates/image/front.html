@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>{{ title }}</title>
-  <link id="theme-stylesheet" rel="stylesheet" href="/css/{{ initial_theme_css }}">
+  <link id="theme-stylesheet" rel="stylesheet" href="{{ script_root }}/css/{{ initial_theme_css }}">
   <style>
     /* Board title - larger and prominent */
     h1 {
@@ -136,12 +136,12 @@
 <body>
 <h1>{{ title }}</h1>
 {% if subtitle %}<p style="text-align:center; color:#666; margin:0 0 0.5em 0; font-size:1.1em;">{{ subtitle }}</p>{% endif %}
-<p style="text-align:center; font-size:10pt; margin: 4px 0 12px;">[<a href="/">Index</a>]{% if mode in ("imageboard", "textboard", "blog") %} [<a href="/catalog">Catalog</a>]{% endif %}</p>
+<p style="text-align:center; font-size:10pt; margin: 4px 0 12px;">[<a href="{{ script_root }}/">Index</a>]{% if mode in ("imageboard", "textboard", "blog") %} [<a href="{{ script_root }}/catalog">Catalog</a>]{% endif %}</p>
 
 {% if error %}<p style="color:red"><strong>Error:</strong> {{ error }}</p>{% endif %}
 
 {% if mode != "blog" or is_admin %}
-<form id="postform" method="post" action="/?task=post" enctype="multipart/form-data">
+<form id="postform" method="post" action="{{ script_root }}/?task=post" enctype="multipart/form-data">
   <input type="hidden" name="markup" value="waka">
   <input type="hidden" name="csrf" value="{{ csrf_token }}">
   <!-- Honeypots for spam (leave these empty) -->
@@ -181,12 +181,12 @@
       {% if t.op.image %}
         <div class="file">
           <span class="fileText">
-            File: <a href="/{{ t.op.image }}" target="_blank">{{ t.op.image.split('/')[-1] }}</a>
+            File: <a href="{{ script_root }}/{{ t.op.image }}" target="_blank">{{ t.op.image.split('/')[-1] }}</a>
             ({{ t.op.size }} B, {{ t.op.width }}x{{ t.op.height }})
           </span>
           <br>
           {% if t.op.thumbnail %}
-            <a class="fileThumb" href="/{{ t.op.image }}" target="_blank">
+            <a class="fileThumb" href="{{ script_root }}/{{ t.op.image }}" target="_blank">
               <img class="fileThumb" src="/{{ t.op.thumbnail }}" alt="{{ t.op.size }} B">
             </a>
           {% endif %}
@@ -206,9 +206,9 @@
         {% endif %}
         {{ t.op.date }}
         <span class="reflink">
-          <a href="/{{ t.thread }}/#{{ t.op.num }}">No.{{ t.op.num }}</a>
+          <a href="{{ script_root }}/{{ t.thread }}/#{{ t.op.num }}">No.{{ t.op.num }}</a>
         </span>
-        <span class="replylink">[<a href="/{{ t.thread }}/">{% if mode == "blog" %}Comment{% else %}Reply{% endif %}</a>]</span>
+        <span class="replylink">[<a href="{{ script_root }}/{{ t.thread }}/">{% if mode == "blog" %}Comment{% else %}Reply{% endif %}</a>]</span>
       </div>
 
       <blockquote class="postMessage" id="m{{ t.op.num }}">
@@ -217,7 +217,7 @@
 
       {% if t.omitted > 0 %}
         <div class="omitted">
-          {{ t.omitted }} posts omitted. <a href="/{{ t.thread }}/">Click here</a> to view.
+          {{ t.omitted }} posts omitted. <a href="{{ script_root }}/{{ t.thread }}/">Click here</a> to view.
         </div>
       {% endif %}
     </div>
@@ -233,11 +233,11 @@
       {% if r.image %}
         <div class="file">
           <span class="fileText">
-            File: <a href="/{{ r.image }}">{{ r.image.split('/')[-1] }}</a>
+            File: <a href="{{ script_root }}/{{ r.image }}">{{ r.image.split('/')[-1] }}</a>
           </span>
           <br>
           {% if r.thumbnail %}
-            <a class="fileThumb" href="/{{ r.image }}" target="_blank">
+            <a class="fileThumb" href="{{ script_root }}/{{ r.image }}" target="_blank">
               <img class="fileThumb" src="/{{ r.thumbnail }}" alt="{{ r.size }} B" style="max-width:125px; max-height:125px;">
             </a>
           {% endif %}
@@ -282,7 +282,7 @@
   </label>
 </div>
 
-<script src="/kareha.js"></script>
+<script src="{{ script_root }}/kareha.js"></script>
 <script>
 function setTheme(theme) {
     const link = document.getElementById('theme-stylesheet');

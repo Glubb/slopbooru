@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>{{ title }} - Catalog</title>
-  <link id="theme-stylesheet" rel="stylesheet" href="/css/{{ initial_theme_css }}">
+  <link id="theme-stylesheet" rel="stylesheet" href="{{ script_root }}/css/{{ initial_theme_css }}">
   <style>
     /* Catalog specific styles - 4chan-like grid (used by imageboard and textboard) */
     .catalog {
@@ -164,7 +164,7 @@
 {% if subtitle %}<p style="text-align:center; color:#666; margin:0 0 0.5em 0; font-size:1.1em;">{{ subtitle }}</p>{% endif %}
 
 <div class="catalog-nav">
-  [<a href="/">Index</a>] [<a href="/catalog">Catalog</a>]
+  [<a href="{{ script_root }}/">Index</a>] [<a href="{{ script_root }}/catalog">Catalog</a>]
 </div>
 
 {% if mode == "blog" %}
@@ -181,7 +181,7 @@
         {% if t.date %}<div class="blog-date">{{ t.date }}</div>{% endif %}
 
         {% if t.title %}
-          <h2 class="blog-title"><a href="/{{ t.thread }}/">{{ t.title }}</a></h2>
+          <h2 class="blog-title"><a href="{{ script_root }}/{{ t.thread }}/">{{ t.title }}</a></h2>
         {% else %}
           <h2 class="blog-title"><a href="/{{ t.thread }}/">Untitled entry</a></h2>
         {% endif %}
@@ -204,7 +204,7 @@
         </div>
         {% endif %}
 
-        <a href="/{{ t.thread }}/" class="blog-readmore">Read more &rarr;</a>
+        <a href="{{ script_root }}/{{ t.thread }}/" class="blog-readmore">Read more &rarr;</a>
       </div>
     </article>
     {% else %}
@@ -217,7 +217,7 @@
     {% for t in threads %}
     <div class="thread" id="t{{ t.thread }}">
       {% if t.op.image and t.op.thumbnail %}
-        <a href="/{{ t.thread }}/" class="thumb">
+        <a href="{{ script_root }}/{{ t.thread }}/" class="thumb">
           <img src="/{{ t.op.thumbnail }}" class="catalog-thumb" alt="thumb">
         </a>
       {% else %}
@@ -255,7 +255,7 @@
   </label>
 </div>
 
-<script src="/kareha.js"></script>
+<script src="{{ script_root }}/kareha.js"></script>
 <script>
 function setTheme(theme) {
     const link = document.getElementById('theme-stylesheet');

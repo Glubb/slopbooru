@@ -14,7 +14,7 @@
 <body>
 <h1>Admin Dashboard</h1>
 {% if subtitle %}<p style="text-align:center; color:#666; margin-top:-0.5em;">{{ subtitle }}</p>{% endif %}
-<p>Logged in as admin. <a href="/">Back to board</a></p>
+<p>Logged in as admin. <a href="{{ script_root }}/">Back to board</a></p>
 
 {% if open_reports %}
 <h2 class="report">Open Reports</h2>
@@ -42,7 +42,7 @@
   {% if t.permasage %}{% set _ = status.append("Permasaged") %}{% endif %}
   {% set status_str = status | join(" | ") or "Normal" %}
   <li>
-    <a href="/admin/thread/{{ t.thread }}?csrf={{ csrf }}">#{{ t.thread }} — {{ t.title or "Untitled" | e }}</a>
+    <a href="{{ script_root }}/admin/thread/{{ t.thread }}?csrf={{ csrf }}">#{{ t.thread }} — {{ t.title or "Untitled" | e }}</a>
     ({{ t.postcount }} posts) - {{ status_str }}
     <span class="actions">
       <a href="?action=close&amp;thread={{ t.thread }}&amp;state=1&amp;csrf={{ csrf }}">Close</a> |
@@ -54,6 +54,6 @@
 {% endfor %}
 </ul>
 
-<p><small>CSRF protected. Use the mod links from thread pages for detailed view. <a href="/admin/logout">Logout</a></small></p>
+<p><small>CSRF protected. Use the mod links from thread pages for detailed view. <a href="{{ script_root }}/admin/logout">Logout</a></small></p>
 </body>
 </html>
