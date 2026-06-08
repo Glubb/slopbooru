@@ -96,7 +96,7 @@ def create_captcha(difficulty: float = 0.6, length: int = 5) -> tuple[str, str]:
     img_b64 = base64.b64encode(img_bytes).decode("ascii")
 
     token = "".join(random.choices(string.ascii_letters + string.digits, k=16))
-    _captcha_store[token] = (answer, time.time() + 600)  # 10 minutes
+    _captcha_store[token] = (answer, time.time() + 180)  # 3 minutes (configurable via CAPTCHA_EXPIRY_SECONDS in future)
     return token, img_b64
 
 

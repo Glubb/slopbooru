@@ -209,11 +209,12 @@
 <form id="replyform" method="post" action="/?task=post" enctype="multipart/form-data">
   <input type="hidden" name="thread" value="{{ thread.thread }}">
   <input type="hidden" name="markup" value="waka">
+  <input type="hidden" name="csrf" value="{{ csrf_token }}">
   <input type="text" name="email" style="display:none">
   <input type="text" name="url" style="display:none">
 
   <p>Name: <input name="field_a" value="{{ 'Admin' if is_admin and mode == 'blog' else '' }}"> Link: <input name="field_b"></p>
-  <p>Del. pass: <input type="password" name="password" size="10" placeholder="for later deletion"></p>
+  <p>Del. pass: <input type="password" name="password" size="10" value="{{ default_delpass }}" placeholder="for later deletion"></p>
   <p><textarea name="comment" rows="5" cols="60"></textarea></p>
   {% if allow_images %}<p>File: <input type="file" name="file"></p>{% endif %}
   {% if enable_captcha %}
@@ -240,7 +241,7 @@
 
 <p style="margin-top: 4px;">
   <a href="/admin/thread/{{ thread.thread }}" target="_blank" title="Open moderation page for this thread">🛠️ Mod thread</a>
-  <small style="color:#666;">(admin)</small>
+  <!-- (admin only) -->
 </p>
 
 <!-- Theme Switcher - Bottom Right -->

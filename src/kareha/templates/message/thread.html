@@ -25,12 +25,14 @@
 <form method="post" action="/?task=post" enctype="multipart/form-data">
   <input type="hidden" name="thread" value="{{ thread.thread }}">
   <input type="hidden" name="markup" value="waka">
+  <input type="hidden" name="csrf" value="{{ csrf_token | default('') }}">
   <!-- Honeypots (leave empty) -->
   <input type="text" name="email" style="display:none">
   <input type="text" name="url" style="display:none">
 
   <p><input name="field_a" value="{{ 'Admin' if is_admin and mode == 'blog' else '' }}" placeholder="Name"> <input name="field_b" placeholder="Link"></p>
   <p><textarea name="comment" rows="5" cols="70"></textarea></p>
+  <p>Del. pass: <input type="password" name="password" size="8" value="{{ default_delpass | default('') }}"></p>
   <p><button type="submit">{% if mode == "blog" %}Comment{% else %}Reply{% endif %}</button></p>
 </form>
 
@@ -44,7 +46,7 @@
 
 <p>
   <a href="/admin/thread/{{ thread.thread }}" target="_blank">🛠️ Mod thread</a>
-  <small>(admin)</small>
+  <!-- (admin only) -->
 </p>
 
 </body>

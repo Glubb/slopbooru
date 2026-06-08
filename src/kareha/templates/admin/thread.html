@@ -19,7 +19,7 @@
 <body>
 <h1>Moderating Thread #{{ thread_id }}</h1>
 {% if subtitle %}<p style="text-align:center; color:#666; margin-top:-0.5em;">{{ subtitle }}</p>{% endif %}
-<p><a href="/admin?csrf={{ csrf }}">← Back to admin dashboard</a></p>
+<p><a href="/admin?csrf={{ csrf }}">← Back to admin dashboard</a> | <a href="/admin/logout">Logout</a></p>
 
 <h2>{{ title | e }}</h2>
 

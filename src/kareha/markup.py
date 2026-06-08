@@ -13,6 +13,8 @@ import re
 from html import escape as html_escape
 from typing import Callable, Iterable
 
+import nh3
+
 from .utils import REPLY_RANGE_RE, url_regexp
 
 __all__ = [
@@ -268,15 +270,32 @@ def raw_html_format(text: str, thread: str, allowed: dict | None = None) -> str:
 
 def sanitize_html(html: str, allowed: dict) -> str:
     """
-    Very lightweight tag whitelist sanitizer.
-    For production a proper library (nh3, bleach, etc.) could replace this.
+    Sanitize user-provided HTML using nh3 (fast, secure Rust-based sanitizer).
+    Falls back to full escaping if no allowlist provided.
+    The `allowed` dict format: {tag: {"args": (attr1, ...), "forced": {...}, "empty": bool}}
+    We map this to nh3's tags + attributes for a clean, legible allowlist.
     """
     if not allowed:
         return html_escape(html)
 
-    # For the first cut we do a permissive-but-escaped version.
-    # Full port of the stack-based parser can be added if needed.
-    return html_escape(html)
+    # Build nh3-compatible allowlist from our ALLOWED_HTML config for legibility and ease.
+    tags = set(allowed.keys())
+    attributes = {}
+    for tag, spec in allowed.items():
+        attrs = spec.get("args", ()) or ()
+        if attrs:
+            attributes[tag] = set(attrs)
+
+    # nh3.clean is strict by default; we strip unknown tags/attrs, remove dangerous stuff (scripts, etc.).
+    # link rel="nofollow" etc. can be added via link_rel if desired.
+    cleaned = nh3.clean(
+        html,
+        tags=tags,
+        attributes=attributes,
+        strip_comments=True,
+        link_rel=None,  # we handle rel in markup if needed
+    )
+    return cleaned
 
 
 # ---------------------------------------------------------------------------

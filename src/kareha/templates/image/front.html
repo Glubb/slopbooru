@@ -143,6 +143,7 @@
 {% if mode != "blog" or is_admin %}
 <form id="postform" method="post" action="/?task=post" enctype="multipart/form-data">
   <input type="hidden" name="markup" value="waka">
+  <input type="hidden" name="csrf" value="{{ csrf_token }}">
   <!-- Honeypots for spam (leave these empty) -->
   <input type="text" name="email" style="display:none">
   <input type="text" name="url" style="display:none">
@@ -154,7 +155,7 @@
   {% if require_title or mode == "blog" %}
     <p>Subject: <input name="title" required></p>
   {% endif %}
-  <p>Del. pass: <input type="password" name="password" size="10" placeholder="optional for deletion"></p>
+  <p>Del. pass: <input type="password" name="password" size="10" value="{{ default_delpass }}" placeholder="8-char auto-generated (cookie)"></p>
   <p><textarea name="comment" rows="6" cols="70" placeholder="Comment"></textarea></p>
   {% if allow_images %}
     <p>File: <input type="file" name="file"></p>
@@ -169,7 +170,7 @@
   <p><button type="submit">{% if mode == "blog" %}Post Entry{% else %}Post{% endif %}</button></p>
 </form>
 {% else %}
-<p><em>Only administrators can create new blog entries.</em></p>
+<!-- Only administrators (with admin cookie) can create new blog entries. -->
 {% endif %}
 
 {% for t in threads %}

@@ -14,6 +14,10 @@ from typing import Optional, Tuple
 
 from PIL import Image, ImageOps
 
+# Resource limits to mitigate decompression bombs / DoS from malicious images
+# Pulled from config at runtime where possible; fallback here for direct calls.
+Image.MAX_IMAGE_PIXELS = 50_000_000  # ~50 megapixels safe default (matches config_defaults)
+
 # Supported image formats for actual image posts (not the icon fallbacks)
 SUPPORTED_FORMATS = {"JPEG", "PNG", "GIF", "WEBP", "BMP"}
 

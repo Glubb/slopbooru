@@ -133,27 +133,21 @@ def post_stuff(
     # Supports keys as either the raw entered trip (e.g. '!!secret') or the computed trip.
     capcode = ""
     capped_trips = getattr(cfg, "CAPPED_TRIPS", {})
-    print(f"[DEBUG CAPPED_TRIPS] Current CAPPED_TRIPS value: {capped_trips}")
     matched = False
     if trip and trip in capped_trips:
         capcode = capped_trips[trip]
         matched = True
-        print(f"[DEBUG CAPPED_TRIPS] Detected computed trip '{trip}' -> capcode set")
     else:
         # Check the raw entered tripcode (e.g. user types "Admin!!secret" or just "!!secret")
         if tripkey in original_name:
             raw_trip_part = original_name.split(tripkey, 1)[1]
             raw_trip = f"{tripkey}{raw_trip_part}"
-            print(f"[DEBUG CAPPED_TRIPS] Checking raw_trip='{raw_trip}' against keys")
             if raw_trip in capped_trips:
                 capcode = capped_trips[raw_trip]
                 trip = ""  # prevent showing both the computed trip and the capcode
                 matched = True
-                print(f"[DEBUG CAPPED_TRIPS] Detected raw trip '{raw_trip}' -> capcode set (len={len(capcode)})")
-            else:
-                print(f"[DEBUG CAPPED_TRIPS] No match for raw_trip='{raw_trip}' - keys were {list(capped_trips.keys()) if capped_trips else 'empty'}")
     if matched:
-        print(f"[DEBUG CAPPED_TRIPS] capcode will be set on this post: {capcode[:80]}...")
+        pass  # capcode set silently for prod (debug prints removed)
 
     if force_capcode:
         capcode = force_capcode
@@ -174,12 +168,17 @@ def post_stuff(
     delpass = password or ""
     delpass_hash = hash_deletion_password(delpass, secret) if delpass else ""
 
-    # Handle file upload (image mode only)
+    # Handle file upload
     image_info = None
     if file_path:
-        m = (mode or "").lower()
-        is_image = m in ("image", "imageboard")
-        if not is_image or not getattr(cfg, "ALLOW_IMAGE_THREADS" if not thread_id else "ALLOW_IMAGE_REPLIES", True):
+        board_mode = getattr(cfg, "BOARD_MODE", "imageboard")
+        if board_mode == "textboard":
+            raise PostError("Image posting not allowed in this context.")
+        # imageboard and blog are controlled by ALLOW_IMAGE_THREADS / ALLOW_IMAGE_REPLIES
+        # (blog new entries by admins; replies respect the flags; text_only for blog comments
+        #  only hides the file input in the form)
+        allow_key = "ALLOW_IMAGE_THREADS" if not thread_id else "ALLOW_IMAGE_REPLIES"
+        if not getattr(cfg, allow_key, True):
             raise PostError("Image posting not allowed in this context.")
 
         ext, width, height = analyze_image(file_path, upload_filename or "")
@@ -282,9 +281,6 @@ def post_stuff(
                     "height": height,
                     "md5": md5 or "",
                 }
-
-                if not thumb_success:
-                    print(f"[WARNING] Failed to generate thumbnail for {final_image}")  # visible in terminal
 
     # Create or append to thread
     if thread_id:

@@ -82,6 +82,21 @@ FORBIDDEN_EXTENSIONS: tuple[str, ...] = (
     "php", "php3", "php4", "phtml", "shtml", "cgi", "pl", "pm", "py", "r",
     "exe", "dll", "scr", "pif", "asp", "cfm", "jsp", "vbs"
 )
+
+# Allowed media for general boards (popular, safe filetypes; no executables)
+ALLOWED_EXTENSIONS: tuple[str, ...] = (
+    ".png", ".jpg", ".jpeg", ".gif", ".webp",
+    ".webm", ".mp4", ".mkv", ".mov",
+    ".mp3", ".ogg", ".flac", ".wav"
+)
+
+# Blog mode (admin-only uploads) can be more permissive (archives, docs, etc.)
+BLOG_ALLOWED_EXTENSIONS: tuple[str, ...] = (
+    ".png", ".jpg", ".jpeg", ".gif", ".webp",
+    ".webm", ".mp4", ".mkv", ".mov",
+    ".mp3", ".ogg", ".flac", ".wav",
+    ".pdf", ".zip", ".7z", ".rar", ".tar", ".gz", ".txt", ".md"
+)
 STUPID_THUMBNAILING: bool = False
 MAX_IMAGE_WIDTH: int = 16384
 MAX_IMAGE_HEIGHT: int = 16384
@@ -93,6 +108,11 @@ MAX_IMAGE_PIXELS: int = 50_000_000
 ENABLE_CAPTCHA: bool = False
 CAPTCHA_HEIGHT: int = 18
 CAPTCHA_DIFFICULTY: float = 0.6   # 0.0 easy ... 1.0 hard (affects distortion/noise)
+CAPTCHA_EXPIRY_SECONDS: int = 180  # 3 minutes (shorter for better security vs 10min)
+
+# Simple in-memory rate limiting (per IP). For production with Caddy, combine with Caddy's rate limiting.
+RATE_LIMIT_POSTS_PER_MIN: int = 5
+RATE_LIMIT_WINDOW_SECONDS: int = 60
 
 # ---------------------------------------------------------------------------
 # Tweaks & features

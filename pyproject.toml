@@ -17,6 +17,7 @@ dependencies = [
   "pillow>=10.0",
   "werkzeug>=3.0",   # minimal WSGI routing + request/response (pragmatic choice for raw WSGI feel)
   "python-multipart>=0.0.6",  # for form parsing in some WSGI setups
+  "nh3>=0.2",  # HTML sanitization (fast, secure, maintained alternative to bleach)
 ]
 
 [project.optional-dependencies]

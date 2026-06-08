@@ -37,6 +37,24 @@ from .core.reports import submit_report, get_open_reports, load_reports, update_
 from .utils import hash_deletion_password  # for verifying user deletion passwords against stored hashes (item 5)
 from . import config as config_module  # to expose current_config for post_stuff etc.
 
+# Simple in-memory rate limiter (per-IP, per-process). For higher scale, use Redis or Caddy's rate limiting in front.
+_post_timestamps: dict[str, list[float]] = {}
+
+def _check_rate_limit(ip: str, cfg: Any) -> bool:
+    """Return True if under limit, False if rate limited."""
+    import time
+    now = time.time()
+    window = getattr(cfg, "RATE_LIMIT_WINDOW_SECONDS", 60)
+    max_posts = getattr(cfg, "RATE_LIMIT_POSTS_PER_MIN", 5)
+    if ip not in _post_timestamps:
+        _post_timestamps[ip] = []
+    # prune old timestamps
+    _post_timestamps[ip] = [t for t in _post_timestamps[ip] if now - t < window]
+    if len(_post_timestamps[ip]) >= max_posts:
+        return False
+    _post_timestamps[ip].append(now)
+    return True
+
 
 def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrides: Any):
     """
@@ -98,6 +116,24 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
         error = None
         is_admin = get_admin_auth(request, cfg)
 
+        # Public CSRF token for posting forms (separate from admin_csrf; cookie-based for stateless "session")
+        public_csrf = ""
+        if hasattr(request, "cookies"):
+            public_csrf = request.cookies.get("csrf_token", "")
+        if not public_csrf:
+            public_csrf = __import__("secrets").token_urlsafe(16)
+
+        default_delpass = ""
+        newly_created_delpass = False
+        if hasattr(request, "cookies"):
+            default_delpass = request.cookies.get("delpass", "")[:8]
+        if not default_delpass:
+            import secrets
+            import string
+            alphabet = string.ascii_letters + string.digits
+            default_delpass = "".join(secrets.choice(alphabet) for _ in range(8))
+            newly_created_delpass = True
+
         # Normal request handling continues below...
 
         # === ADMIN INTERFACE ===
@@ -125,6 +161,12 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
 
             is_admin = get_admin_auth(request, cfg)
 
+            if request.path == "/admin/logout":
+                resp = Response(status=303, headers={"Location": "/"})
+                resp.set_cookie("admin_auth", "", expires=0, path="/")
+                resp.set_cookie("admin_csrf", "", expires=0, path="/")
+                return resp
+
             if not is_admin:
                 return Response(
                     "<h1>Admin Login</h1>"
@@ -132,7 +174,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                     'Admin Pass: <input type="password" name="admin" autocomplete="current-password">'
                     '<button type="submit">Login</button>'
                     "</form>"
-                    "<p><small>Auth via HttpOnly cookie + CSRF on actions (items 1,2,3,4).</small></p>",
+                    "<p><small><!-- Auth via HttpOnly cookie + CSRF on actions --></small></p>",
                     mimetype="text/html",
                 )
 
@@ -414,6 +456,27 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                 board_mode = getattr(cfg, "BOARD_MODE", "imageboard")
                 if board_mode == "blog" and not is_admin:
                     raise PostError("Only administrators can create new blog entries.")
+
+                blog_comments = getattr(cfg, "BLOG_COMMENTS", "enabled") if board_mode == "blog" else "enabled"
+
+                # Rate limiting (quick win for public deploys)
+                client_ip = request.remote_addr or "127.0.0.1"
+                if not _check_rate_limit(client_ip, cfg):
+                    raise PostError("Rate limit exceeded. Please wait a minute before posting again.")
+
+                # CSRF check for public posts (quick win)
+                submitted_csrf = request.form.get("csrf", "")
+                if public_csrf and submitted_csrf != public_csrf:
+                    raise PostError("CSRF validation failed. Please refresh the page and try again.")
+
+                # Auto-generate 8-char deletion password if none provided; tie to cookie for "session"
+                del_password = request.form.get("password", "") or ""
+                if not del_password:
+                    import secrets
+                    import string
+                    alphabet = string.ascii_letters + string.digits
+                    del_password = "".join(secrets.choice(alphabet) for _ in range(8))
+
                 # Save uploaded file temporarily
                 uploaded_file = request.files.get("file")
                 tmp_path = None
@@ -424,6 +487,12 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                     # Take only the basename and a very limited suffix.
                     orig = Path(uploaded_file.filename).name  # strips any directory components
                     suffix = Path(orig).suffix.lower()
+                    # Enforce allowed extensions (general vs blog permissive)
+                    allowed_exts = getattr(cfg, "BLOG_ALLOWED_EXTENSIONS", ()) if (board_mode == "blog" and is_admin) else getattr(cfg, "ALLOWED_EXTENSIONS", ())
+                    if suffix and suffix not in allowed_exts:
+                        # For non-blog or non-admin, reject disallowed; for blog admin allow broader but still sanitize
+                        if not (board_mode == "blog" and is_admin):
+                            raise PostError(f"Filetype {suffix} not allowed.")
                     # Allow only very safe characters in the suffix
                     safe_suffix = "".join(c for c in suffix if c.isalnum() or c in ".-_")[:12]
                     if not safe_suffix or safe_suffix == ".":
@@ -433,6 +502,13 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                     tmp_path = tmp.name
                     # Keep a sanitized version of the original name for display only (not for FS ops)
                     upload_name = orig[:200]  # cap length too
+
+                # Enforce no images on blog comments when BLOG_COMMENTS=text_only (even if form is bypassed)
+                if tmp_path and board_mode == "blog" and request.form.get("thread") and blog_comments == "text_only":
+                    Path(tmp_path).unlink(missing_ok=True)
+                    tmp_path = None
+                    upload_name = None
+                    raise PostError("Image posting not allowed in this context.")
 
                 # Captcha check (skip for admin tripcode / capped posts)
                 enable_captcha = getattr(cfg, "ENABLE_CAPTCHA", False)
@@ -469,7 +545,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                     title=request.form.get("title", ""),
                     comment=request.form.get("comment", ""),
                     markup=request.form.get("markup", "waka"),
-                    password=request.form.get("password", ""),  # deletion password (hashed at storage)
+                    password=del_password,  # deletion password (auto-generated 8 chars if empty; tied to cookie)
                     file_path=tmp_path,
                     upload_filename=upload_name,
                     ip=request.remote_addr or "127.0.0.1",
@@ -483,11 +559,15 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                 if tmp_path:
                     Path(tmp_path).unlink(missing_ok=True)
 
-                # Redirect to front or thread
+                # Redirect to front or thread; set delpass cookie so it's "married" to user's session/cookie for future convenience
                 if request.form.get("thread"):
-                    return Response(status=303, headers={"Location": f"/{request.form['thread']}/"})
+                    loc = f"/{request.form['thread']}/"
                 else:
-                    return Response(status=303, headers={"Location": "/"})
+                    loc = "/"
+                resp = Response(status=303, headers={"Location": loc})
+                if del_password:
+                    resp.set_cookie("delpass", del_password, httponly=True, samesite="Lax", max_age=86400*365, path="/")
+                return resp
 
             except Exception as e:
                 error = str(e)
@@ -528,8 +608,17 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                         enable_captcha=enable_captcha,
                         captcha_token=captcha_token,
                         captcha_image=captcha_image,
+                        csrf_token=public_csrf,
+                        default_delpass=default_delpass,
                     )
-                    return Response(html, mimetype="text/html")
+                    resp = Response(html, mimetype="text/html")
+                    if not request.cookies.get("csrf_token"):
+                        resp.set_cookie("csrf_token", public_csrf, httponly=True, samesite="Lax", max_age=86400*30, path="/")
+                    if newly_created_delpass:
+                        resp.set_cookie("delpass", default_delpass, httponly=True, samesite="Lax", max_age=86400*365, path="/")
+                    resp.headers["X-Content-Type-Options"] = "nosniff"
+                    resp.headers["Referrer-Policy"] = "same-origin"
+                    return resp
             except Exception:
                 # Fall through to normal (front page) error display
                 pass
@@ -620,8 +709,17 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                 captcha_token=captcha_token,
                 captcha_image=captcha_image,
                 is_admin=is_admin,
+                csrf_token=public_csrf,
+                default_delpass=default_delpass,
             )
-            return Response(html, mimetype="text/html")
+            resp = Response(html, mimetype="text/html")
+            if not request.cookies.get("csrf_token"):
+                resp.set_cookie("csrf_token", public_csrf, httponly=True, samesite="Lax", max_age=86400*30, path="/")
+            if newly_created_delpass:
+                resp.set_cookie("delpass", default_delpass, httponly=True, samesite="Lax", max_age=86400*365, path="/")
+            resp.headers["X-Content-Type-Options"] = "nosniff"
+            resp.headers["Referrer-Policy"] = "same-origin"
+            return resp
 
         # === CATALOG VIEW ===
         # imageboard / textboard: classic 4chan-style grid (thumbnails or "No image" + short teasers, lasthit order)
@@ -746,13 +844,31 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, **cfg_overrid
                 captcha_image=captcha_image,
                 is_admin=is_admin,
                 blog_comments=blog_comments,
+                csrf_token=public_csrf,
+                default_delpass=default_delpass,
             )
-            return Response(html, mimetype="text/html")
+            resp = Response(html, mimetype="text/html")
+            if not request.cookies.get("csrf_token"):
+                resp.set_cookie("csrf_token", public_csrf, httponly=True, samesite="Lax", max_age=86400*30, path="/")
+            if newly_created_delpass:
+                resp.set_cookie("delpass", default_delpass, httponly=True, samesite="Lax", max_age=86400*365, path="/")
+            resp.headers["X-Content-Type-Options"] = "nosniff"
+            resp.headers["Referrer-Policy"] = "same-origin"
+            return resp
 
         return Response("Not found", status=404)
 
     # Use proper SharedDataMiddleware for serving board static files (src/, thumb/, css/, etc.)
     # This is much more reliable than manual handling inside the view.
+    #
+    # For Caddy (user's reverse proxy): Add security headers in Caddyfile, e.g.:
+    #   header {
+    #       Strict-Transport-Security "max-age=31536000;"
+    #       X-Content-Type-Options "nosniff"
+    #       Referrer-Policy "same-origin"
+    #       # CSP can be tuned for your CSS/JS
+    #   }
+    #   Also use Caddy's rate limiting: rate_limit { ... } for posts etc.
     static_folders = {
         '/src': str(board_dir / getattr(cfg, 'IMG_DIR', 'src/').rstrip('/')),
         '/thumb': str(board_dir / getattr(cfg, 'THUMB_DIR', 'thumb/').rstrip('/')),
