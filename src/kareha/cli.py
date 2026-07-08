@@ -34,6 +34,11 @@ def cmd_init(args: argparse.Namespace) -> int:
     if spam.exists():
         shutil.copy(spam, target / "spam.txt")
 
+    # Empty reports store template (runtime reports.json is gitignored)
+    reports_example = src_root / "reports.json.example"
+    if reports_example.exists():
+        shutil.copy(reports_example, target / "reports.json.example")
+
     # CSS (both modes)
     css_src = py_src / "static" / "css"
     if css_src.exists():

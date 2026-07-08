@@ -16,8 +16,10 @@ import hmac
 import os
 import re
 import secrets
+import shutil
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
@@ -294,3 +296,22 @@ def make_anonymous(ip: str, t: float, thread: Any) -> str:
     # Very basic placeholder — the original had many SILLY_ANONYMOUS / FORCED_ANON variants.
     # For now we just return the configured anonymous name or "Anonymous".
     return "Anonymous"
+
+
+def ensure_board_directories(board_dir: Path, cfg: Any) -> None:
+    """
+    Create runtime board folders if missing (safe on every serve/start).
+
+    Cloned repos ship empty placeholders (res/.gitkeep, thumb/.gitkeep, etc.);
+    uploads and thread JSON stay gitignored and are created here or on first use.
+    """
+    board_dir = Path(board_dir)
+    for attr in ("RES_DIR", "IMG_DIR", "THUMB_DIR", "RUNTIME_DIR", "INCLUDE_DIR"):
+        rel = getattr(cfg, attr, None)
+        if rel:
+            (board_dir / rel).mkdir(parents=True, exist_ok=True)
+
+    reports = board_dir / "reports.json"
+    example = board_dir / "reports.json.example"
+    if not reports.exists() and example.exists():
+        shutil.copy(example, reports)

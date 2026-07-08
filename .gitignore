@@ -23,7 +23,7 @@ thumb/*
 !thumb/.gitkeep
 
 # Board image upload dir (IMG_DIR). Only src/kareha/ is the Python package — not uploads.
-/src/
+/src/*
 !/src/kareha/
 !/src/kareha/**
 /src/kareha/**/__pycache__/

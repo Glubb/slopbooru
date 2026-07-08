@@ -43,6 +43,7 @@ from .error_pages import (
     wrap_with_error_pages,
 )
 from .http_helpers import apply_security_headers, get_client_ip, safe_user_error
+from .utils import ensure_board_directories
 from .runtime_store import check_rate_limit as shared_check_rate_limit
 from . import config as config_module
 
@@ -116,6 +117,8 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
     # empty defaults dict even though load_config correctly read your CAPPED_TRIPS.
     from . import config as config_module
     config_module.current_config = cfg
+
+    ensure_board_directories(board_dir, cfg)
 
     # Normalize base_path for subpath mounting (e.g. "/board1")
     base_path = (base_path or "").strip()
