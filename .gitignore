@@ -16,16 +16,15 @@ env/
 ENV/
 
 # Board runtime data (when the project root or subdirs are used as boards)
-# Media uploads, thread storage, thumbnails
+# Thread storage, thumbnails, uploaded media — never commit these
 res/
 thumb/
 
-# Root-level src/ is used for board image uploads in some setups.
-# Keep the Python package under src/kareha/; ignore uploaded media at src/ root only.
-src/*
-!src/kareha/
-!src/kareha/**
-src/kareha/**/__pycache__/
+# Board image upload dir (IMG_DIR). Only src/kareha/ is the Python package — not uploads.
+/src/
+!/src/kareha/
+!/src/kareha/**
+/src/kareha/**/__pycache__/
 
 # OS / editor noise
 .DS_Store
