@@ -17,12 +17,11 @@ def cmd_init(args: argparse.Namespace) -> int:
     target = Path(args.directory).resolve()
     target.mkdir(parents=True, exist_ok=True)
 
-    src_root = Path(__file__).parent.parent.parent  # kareha_py/
-    py_src = src_root / "src" / "kareha"
+    src_root = Path(__file__).parent.parent.parent  # repo root when installed editable
 
-    # Directories a board needs
-    for d in ("res", "src", "thumb", "include", "css"):
-        (target / d).mkdir(exist_ok=True)
+    from .utils import ensure_board_directories
+    from .config import load_config, make_config_object
+    from . import config_defaults
 
     # Example config (user should copy to config.py themselves)
     cfg_example = src_root / "config.py.example"
@@ -39,36 +38,12 @@ def cmd_init(args: argparse.Namespace) -> int:
     if reports_example.exists():
         shutil.copy(reports_example, target / "reports.json.example")
 
-    # CSS (both modes)
-    css_src = py_src / "static" / "css"
-    if css_src.exists():
-        for css in css_src.glob("*.css"):
-            shutil.copy(css, target / "css" / css.name)
-
-    # Icons
-    icons_src = py_src / "static" / "icons"
-    if icons_src.exists():
-        (target / "icons").mkdir(exist_ok=True)
-        for icon in icons_src.glob("*"):
-            shutil.copy(icon, target / "icons" / icon.name)
-
-    # JS
-    js = py_src / "static" / "kareha.js"
-    if js.exists():
-        shutil.copy(js, target / "kareha.js")
-
-    # Include examples (empty placeholders)
-    for name in ("header.html", "footer.html", "rules.html"):
-        (target / "include" / name).touch(exist_ok=True)
-
-    # Copy templates for both modes
-    (target / "templates").mkdir(exist_ok=True)
-    for mode_name in ("image", "message"):
-        pkg_templates = py_src / "templates" / mode_name
-        if pkg_templates.exists():
-            for tmpl in pkg_templates.glob("*.html"):
-                shutil.copy(tmpl, target / "templates" / tmpl.name)
-    # Note: blog reuses message templates for now; no separate blog/ dir needed
+    cfg_path = target / "config.py"
+    if cfg_path.exists():
+        cfg = make_config_object(load_config(cfg_path))
+    else:
+        cfg = make_config_object(config_defaults.get_defaults_dict())
+    ensure_board_directories(target, cfg)
 
     print(f"Initialized Kareha board at {target}")
     print("Copy config.py.example to config.py (set ADMIN_PASS + SECRET), then run: kareha serve", target)

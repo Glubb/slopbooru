@@ -22,6 +22,12 @@ res/*
 thumb/*
 !thumb/.gitkeep
 
+# Board static copies (canonical themes live in src/kareha/static/; seeded on init/serve)
+/css/
+/icons/
+/kareha.js
+/include/
+
 # Board image upload dir (IMG_DIR). Only src/kareha/ is the Python package — not uploads.
 /src/*
 !/src/kareha/

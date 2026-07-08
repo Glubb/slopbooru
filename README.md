@@ -125,6 +125,25 @@ Copy and edit `deploy/systemd/slopbooru-board.service.example`. Set `board_dir`,
 - Uploaded files and board data (`res/`, `thumb/`, `config.py`, `.runtime/`) should never be committed — see `.gitignore`.
 - Set strong `ADMIN_PASS` and a long random `SECRET` before going live.
 
+## Repository layout
+
+This repo contains both the **Python package** and **example board scaffolding**. Keep them separate in your head:
+
+| Path | Role |
+|------|------|
+| `src/kareha/` | Canonical application code (WSGI, posting, admin, templates) |
+| `src/kareha/static/` | Bundled CSS themes, `kareha.js`, and file-type icons (source of truth) |
+| `src/kareha/templates/` | Jinja templates served for every board (not copied into board dirs) |
+| `config.py.example` | Template for a board's `config.py` (secrets — never commit the real file) |
+| `spam.txt`, `reports.json.example` | Copied into new boards by `kareha init` |
+| `res/`, `thumb/` | Board runtime (thread JSON, thumbnails) — gitignored except `.gitkeep` |
+| `src/` (repo root) | **Upload directory** when the repo root is used as a board (`IMG_DIR`); not the Python package |
+| `css/`, `kareha.js`, `include/` | Board-local copies seeded from the package on `kareha init` / first `serve` — gitignored |
+
+**Using this repo as a dev board:** run `kareha serve .` from the repo root after copying `config.py.example` → `config.py`. Runtime data and seeded static files stay local and out of git.
+
+**Production boards:** use `kareha init /path/to/board` (or your own directory layout) and point gunicorn at that path — see [Running in Production](#running-in-production).
+
 ## Notes
 
 - Storage uses per-thread JSON files (easy to inspect/backup).

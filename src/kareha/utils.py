@@ -298,6 +298,36 @@ def make_anonymous(ip: str, t: float, thread: Any) -> str:
     return "Anonymous"
 
 
+def seed_board_static_assets(board_dir: Path) -> None:
+    """Copy default CSS, JS, and icons from the package when a board lacks them."""
+    board_dir = Path(board_dir)
+    pkg_static = Path(__file__).parent / "static"
+
+    css_dst = board_dir / "css"
+    css_dst.mkdir(parents=True, exist_ok=True)
+    css_src = pkg_static / "css"
+    if css_src.is_dir():
+        for css in css_src.glob("*.css"):
+            dst = css_dst / css.name
+            if not dst.exists():
+                shutil.copy(css, dst)
+
+    icons_src = pkg_static / "icons"
+    if icons_src.is_dir():
+        icons_dst = board_dir / "icons"
+        icons_dst.mkdir(parents=True, exist_ok=True)
+        for icon in icons_src.iterdir():
+            if icon.is_file():
+                dst = icons_dst / icon.name
+                if not dst.exists():
+                    shutil.copy(icon, dst)
+
+    js_src = pkg_static / "kareha.js"
+    js_dst = board_dir / "kareha.js"
+    if js_src.is_file() and not js_dst.exists():
+        shutil.copy(js_src, js_dst)
+
+
 def ensure_board_directories(board_dir: Path, cfg: Any) -> None:
     """
     Create runtime board folders if missing (safe on every serve/start).
@@ -306,10 +336,19 @@ def ensure_board_directories(board_dir: Path, cfg: Any) -> None:
     uploads and thread JSON stay gitignored and are created here or on first use.
     """
     board_dir = Path(board_dir)
-    for attr in ("RES_DIR", "IMG_DIR", "THUMB_DIR", "RUNTIME_DIR", "INCLUDE_DIR"):
+    for attr in ("RES_DIR", "IMG_DIR", "THUMB_DIR", "RUNTIME_DIR", "INCLUDE_DIR", "CSS_DIR"):
         rel = getattr(cfg, attr, None)
         if rel:
             (board_dir / rel).mkdir(parents=True, exist_ok=True)
+
+    include_dir = board_dir / getattr(cfg, "INCLUDE_DIR", "include")
+    include_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("header.html", "footer.html", "rules.html"):
+        placeholder = include_dir / name
+        if not placeholder.exists():
+            placeholder.touch()
+
+    seed_board_static_assets(board_dir)
 
     reports = board_dir / "reports.json"
     example = board_dir / "reports.json.example"
