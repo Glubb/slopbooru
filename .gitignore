@@ -18,7 +18,8 @@ ENV/
 # Board runtime data (when the project root or subdirs are used as boards)
 # Thread storage, thumbnails, uploaded media — never commit these
 res/
-thumb/
+thumb/*
+!thumb/.gitkeep
 
 # Board image upload dir (IMG_DIR). Only src/kareha/ is the Python package — not uploads.
 /src/
