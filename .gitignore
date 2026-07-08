@@ -17,7 +17,8 @@ ENV/
 
 # Board runtime data (when the project root or subdirs are used as boards)
 # Thread storage, thumbnails, uploaded media — never commit these
-res/
+res/*
+!res/.gitkeep
 thumb/*
 !thumb/.gitkeep
 
@@ -51,8 +52,8 @@ systemd/
 # Agent continuity notes (local only, never push)
 .agent-worklog.md
 
-# Board runtime / moderation data
-reports.json
+# Board runtime / moderation data (use reports.json.example as template)
+/reports.json
 banned_ips.txt
 banned_md5.txt
 .runtime/
