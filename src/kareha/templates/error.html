@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ status }} — {{ title | e }}</title>
+  <link rel="stylesheet" href="{{ script_root }}/css/{{ initial_theme_css }}">
+  <style>
+    body { margin: 2em auto; max-width: 640px; font-family: sans-serif; line-height: 1.5; }
+    h1 { font-size: 1.6em; margin-bottom: 0.3em; }
+    .code { color: #888; font-size: 0.95em; }
+    .message { margin: 1.2em 0; padding: 12px 14px; background: #fff3f3; border: 1px solid #e8b4b4; }
+    .details { margin-top: 1em; font-size: 0.85em; color: #555; background: #f8f8f8; padding: 10px; overflow-x: auto; }
+    .actions { margin-top: 1.5em; }
+    .actions a { margin-right: 1em; }
+  </style>
+</head>
+<body>
+  <p class="code">Error {{ status }}</p>
+  <h1>{{ heading | e }}</h1>
+  <div class="message">{{ message | e }}</div>
+  {% if details %}
+  <pre class="details">{{ details | e }}</pre>
+  {% endif %}
+  <p class="actions">
+    <a href="{{ script_root }}/">← Back to board</a>
+    {% if status >= 500 %}
+    <a href="javascript:location.reload()">Try again</a>
+    {% endif %}
+  </p>
+</body>
+</html>

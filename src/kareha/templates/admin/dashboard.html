@@ -9,6 +9,11 @@
     .report { color: #c00; }
     ul { line-height: 1.6; }
     .actions { font-size: 0.9em; }
+    .actions form { display: inline; margin: 0; }
+    .actions button.linkish {
+      background: none; border: none; padding: 0; color: #00e;
+      text-decoration: underline; cursor: pointer; font: inherit;
+    }
   </style>
 </head>
 <body>
@@ -25,8 +30,13 @@
       Thread {{ report.thread }} / Post {{ report.post }}
     </a> -
     <strong>{{ report.reason | e }}</strong>
-    ({{ report.time_str }}) 
-    <a href="?action=report_handled&amp;index={{ loop.index0 }}&amp;csrf={{ csrf }}">Mark Handled</a>
+    ({{ report.time_str }})
+    <form method="post" action="{{ script_root }}/admin" style="display:inline">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="action" value="report_handled">
+      <input type="hidden" name="index" value="{{ loop.index0 }}">
+      <button type="submit" class="linkish">Mark Handled</button>
+    </form>
   </li>
 {% endfor %}
 </ul>
@@ -42,18 +52,42 @@
   {% if t.permasage %}{% set _ = status.append("Permasaged") %}{% endif %}
   {% set status_str = status | join(" | ") or "Normal" %}
   <li>
-    <a href="{{ script_root }}/admin/thread/{{ t.thread }}?csrf={{ csrf }}">#{{ t.thread }} — {{ t.title or "Untitled" | e }}</a>
+    <a href="{{ script_root }}/admin/thread/{{ t.thread }}">#{{ t.thread }} — {{ t.title or "Untitled" | e }}</a>
     ({{ t.postcount }} posts) - {{ status_str }}
     <span class="actions">
-      <a href="?action=close&amp;thread={{ t.thread }}&amp;state=1&amp;csrf={{ csrf }}">Close</a> |
-      <a href="?action=close&amp;thread={{ t.thread }}&amp;state=0&amp;csrf={{ csrf }}">Open</a> |
-      <a href="?action=permasage&amp;thread={{ t.thread }}&amp;state=1&amp;csrf={{ csrf }}">Permasage</a> |
-      <a href="?action=permasage&amp;thread={{ t.thread }}&amp;state=0&amp;csrf={{ csrf }}">Unpermasage</a>
+      <form method="post" action="{{ script_root }}/admin">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="action" value="close">
+        <input type="hidden" name="thread" value="{{ t.thread }}">
+        <input type="hidden" name="state" value="1">
+        <button type="submit" class="linkish">Close</button>
+      </form> |
+      <form method="post" action="{{ script_root }}/admin">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="action" value="close">
+        <input type="hidden" name="thread" value="{{ t.thread }}">
+        <input type="hidden" name="state" value="0">
+        <button type="submit" class="linkish">Open</button>
+      </form> |
+      <form method="post" action="{{ script_root }}/admin">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="action" value="permasage">
+        <input type="hidden" name="thread" value="{{ t.thread }}">
+        <input type="hidden" name="state" value="1">
+        <button type="submit" class="linkish">Permasage</button>
+      </form> |
+      <form method="post" action="{{ script_root }}/admin">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="action" value="permasage">
+        <input type="hidden" name="thread" value="{{ t.thread }}">
+        <input type="hidden" name="state" value="0">
+        <button type="submit" class="linkish">Unpermasage</button>
+      </form>
     </span>
   </li>
 {% endfor %}
 </ul>
 
-<p><small>CSRF protected. Use the mod links from thread pages for detailed view. <a href="{{ script_root }}/admin/logout">Logout</a></small></p>
+<p><small>CSRF protected POST actions. <a href="{{ script_root }}/admin/logout">Logout</a></small></p>
 </body>
 </html>

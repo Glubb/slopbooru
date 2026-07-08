@@ -78,7 +78,13 @@ def cmd_serve(args: argparse.Namespace) -> int:
     app = make_app(board_dir, mode=args.mode)
     shown_mode = args.mode or "(from BOARD_MODE in config.py or default)"
     print(f"Serving {board_dir} (mode={shown_mode}) on http://127.0.0.1:{args.port}")
-    run_simple("127.0.0.1", args.port, app, use_reloader=args.reload, use_debugger=True)
+    run_simple(
+        "127.0.0.1",
+        args.port,
+        app,
+        use_reloader=args.reload,
+        use_debugger=args.debug,
+    )
     return 0
 
 
@@ -100,6 +106,11 @@ def main() -> int:
     )
     p_serve.add_argument("--port", type=int, default=8000)
     p_serve.add_argument("--reload", action="store_true")
+    p_serve.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable Werkzeug interactive debugger (insecure; local dev only)",
+    )
     p_serve.set_defaults(func=cmd_serve)
 
     args = parser.parse_args()

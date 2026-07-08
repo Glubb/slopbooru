@@ -110,9 +110,27 @@ CAPTCHA_HEIGHT: int = 18
 CAPTCHA_DIFFICULTY: float = 0.6   # 0.0 easy ... 1.0 hard (affects distortion/noise)
 CAPTCHA_EXPIRY_SECONDS: int = 180  # 3 minutes (shorter for better security vs 10min)
 
-# Simple in-memory rate limiting (per IP). For production with Caddy, combine with Caddy's rate limiting.
+# Rate limiting (per IP, file-backed for multi-worker gunicorn). Also use Caddy rate_limit in production.
 RATE_LIMIT_POSTS_PER_MIN: int = 5
 RATE_LIMIT_WINDOW_SECONDS: int = 60
+REPORT_RATE_LIMIT_POSTS: int = 10
+REPORT_RATE_LIMIT_WINDOW_SECONDS: int = 300
+
+# Reverse proxy: number of trusted hops for X-Forwarded-For (1 = Caddy/nginx directly in front)
+TRUSTED_PROXY_COUNT: int = 1
+
+# Worker-shared runtime files (captcha, rate limits) — relative to board root
+RUNTIME_DIR: str = ".runtime/"
+
+# Enforced IP ban list (one IP per line; admin portal appends here)
+BANNED_IP_FILE: str = "banned_ips.txt"
+
+# Optional CSP override (None = sensible default applied by http_helpers)
+CONTENT_SECURITY_POLICY: str | None = None
+
+# Error pages: never show tracebacks to users unless explicitly enabled (dev only)
+SHOW_ERROR_DETAILS: bool = False
+ERROR_LOG_FILE: str = "error.log"
 
 # ---------------------------------------------------------------------------
 # Tweaks & features
@@ -176,7 +194,7 @@ ADMIN_SHOWN_LINES: int = 10
 ADMIN_SHOWN_POSTS: int = 10
 ADMIN_MASK_IPS: bool = True
 ADMIN_EDITABLE_FILES: tuple[str, ...] = SPAM_FILES + (BANNED_MD5_FILE,)
-ADMIN_BAN_FILE: str = ".htaccess"   # or None to disable .htaccess style bans
+ADMIN_BAN_FILE: str = ".htaccess"   # legacy Apache-style log (also parsed for bans)
 ADMIN_BAN_TEMPLATE: str = """# Banned IP: <var $reason> (<var $date>)\nDeny from <var $ip>\n"""
 
 # Filetype icons (for non-image uploads in image mode)

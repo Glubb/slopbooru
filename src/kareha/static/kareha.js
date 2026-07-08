@@ -49,20 +49,31 @@ function size_field(id,rows) { document.getElementById(id).comment.setAttribute(
 
 function delete_post(thread,post,file)
 {
-	if(confirm("Are you sure you want to delete reply "+post+"?"))
-	{
-		var fileonly=false;
-		var script=document.forms[0].action;
-		var password=document.forms[0].password.value;
+	if(!confirm("Are you sure you want to delete reply "+post+"?")) return;
 
-		if(file) fileonly=confirm("Leave the reply text and delete the only file?");
+	var fileonly=false;
+	var base=document.forms[0].action.split("?")[0];
+	var password=document.forms[0].password.value;
 
-		document.location=script
-		+"?task=delete"
-		+"&delete="+thread+","+post
-		+"&password="+password
-		+"&fileonly="+(fileonly?"1":"0");
+	if(file) fileonly=confirm("Leave the reply text and delete the only file?");
+
+	var form=document.createElement("form");
+	form.method="POST";
+	form.action=base;
+	form.style.display="none";
+
+	function add(name,val){
+		var i=document.createElement("input");
+		i.type="hidden"; i.name=name; i.value=val;
+		form.appendChild(i);
 	}
+	add("task","delete");
+	add("delete",thread+","+post);
+	add("password",password);
+	add("fileonly",fileonly?"1":"0");
+
+	document.body.appendChild(form);
+	form.submit();
 }
 
 function preview_post(formid,thread)

@@ -49,7 +49,11 @@ YOUR_DOMAIN {
         # are proxied. handle_path strips /yourboard so the WSGI app sees clean paths like /admin .
         # The app uses the base_path you configured to generate correct outgoing links/cookies/redirects.
         handle_path /yourboard/* {
-            reverse_proxy 127.0.0.1:YOUR_PORT
+            reverse_proxy 127.0.0.1:YOUR_PORT {
+                # Required for per-IP rate limits, poster IDs, and admin IP display
+                header_up X-Forwarded-For {remote_host}
+                header_up X-Forwarded-Proto {scheme}
+            }
         }
     }
 

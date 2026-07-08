@@ -1,26 +1,19 @@
 """
 Simple PIL-based captcha generator for Kareha boards.
-Uses difficulty to control noise/distortion.
+Uses difficulty to control noise/distortion. Answers stored in the board's
+file-backed runtime store so validation works across gunicorn workers.
 """
 
 import base64
 import random
 import string
-import time
 from io import BytesIO
+from pathlib import Path
+from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
-# In-memory store: token -> (answer, expiry_ts)
-_captcha_store: dict[str, tuple[str, float]] = {}
-
-
-def _cleanup_store() -> None:
-    """Remove expired entries."""
-    now = time.time()
-    expired = [k for k, (_, exp) in _captcha_store.items() if exp < now]
-    for k in expired:
-        _captcha_store.pop(k, None)
+from .runtime_store import captcha_consume, captcha_put
 
 
 def _get_font(size: int = 22):
@@ -35,7 +28,6 @@ def _get_font(size: int = 22):
             return ImageFont.truetype(cand, size)
         except Exception:
             continue
-    # Last resort
     try:
         return ImageFont.load_default().font_variant(size=size)
     except Exception:
@@ -48,11 +40,9 @@ def generate_captcha_image(text: str, width: int = 140, height: int = 32, diffic
     draw = ImageDraw.Draw(img)
     font = _get_font(22)
 
-    # Draw characters with jitter
     x = random.randint(4, 8)
     for char in text:
         y = random.randint(2, max(2, height - 24))
-        # Slight color variation
         color = (
             random.randint(20, 80),
             random.randint(10, 60),
@@ -61,7 +51,6 @@ def generate_captcha_image(text: str, width: int = 140, height: int = 32, diffic
         draw.text((x, y), char, font=font, fill=color)
         x += random.randint(16, 20) + int(random.gauss(0, difficulty * 3))
 
-    # Add noise lines / dots based on difficulty
     num_lines = int(3 + difficulty * 6)
     for _ in range(num_lines):
         x1, y1 = random.randint(0, width), random.randint(0, height)
@@ -73,7 +62,6 @@ def generate_captcha_image(text: str, width: int = 140, height: int = 32, diffic
         x, y = random.randint(0, width), random.randint(0, height)
         draw.point((x, y), fill=(150, 150, 150))
 
-    # Mild blur for higher difficulty
     if difficulty > 0.5:
         img = img.filter(ImageFilter.GaussianBlur(radius=0.6))
 
@@ -82,30 +70,38 @@ def generate_captcha_image(text: str, width: int = 140, height: int = 32, diffic
     return buf.getvalue()
 
 
-def create_captcha(difficulty: float = 0.6, length: int = 5) -> tuple[str, str]:
+def create_captcha(
+    difficulty: float = 0.6,
+    length: int = 5,
+    *,
+    board_dir: Path | None = None,
+    cfg: Any = None,
+) -> tuple[str, str]:
     """
     Generate a new captcha.
-    Returns (token, image_b64) where image_b64 is the base64 part for data: URL.
-    The answer is stored server-side.
+    Returns (token, image_b64) for data: URL embedding.
     """
-    _cleanup_store()
-    chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no confusing 0O1I
+    chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
     answer = "".join(random.choice(chars) for _ in range(length))
-
     img_bytes = generate_captcha_image(answer, difficulty=difficulty)
     img_b64 = base64.b64encode(img_bytes).decode("ascii")
-
     token = "".join(random.choices(string.ascii_letters + string.digits, k=16))
-    _captcha_store[token] = (answer, time.time() + 180)  # 3 minutes (configurable via CAPTCHA_EXPIRY_SECONDS in future)
+
+    expiry = float(getattr(cfg, "CAPTCHA_EXPIRY_SECONDS", 180) if cfg else 180)
+    if board_dir is not None and cfg is not None:
+        captcha_put(board_dir, cfg, token, answer, expiry)
+
     return token, img_b64
 
 
-def validate_captcha(token: str, answer: str) -> bool:
-    """Return True if the answer matches the stored one for the token (consumes the token)."""
-    _cleanup_store()
-    if not token or token not in _captcha_store:
-        return False
-    correct, _ = _captcha_store.pop(token, (None, 0))
-    if correct is None:
-        return False
-    return answer.upper().strip() == correct.upper()
+def validate_captcha(
+    token: str,
+    answer: str,
+    *,
+    board_dir: Path | None = None,
+    cfg: Any = None,
+) -> bool:
+    """Return True if answer matches (consumes the token)."""
+    if board_dir is not None and cfg is not None:
+        return captcha_consume(board_dir, cfg, token, answer)
+    return False

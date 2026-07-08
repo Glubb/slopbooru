@@ -18,42 +18,60 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from werkzeug.wrappers import Request, Response
 from werkzeug.serving import run_simple
 from werkzeug.middleware.shared_data import SharedDataMiddleware
+from werkzeug.middleware.proxy_fix import ProxyFix
 
+from .admin_actions import process_admin_action
 from .config import load_config, make_config_object
-from .core.posting import post_stuff
+from .core.posting import post_stuff, PostError
 from .core.deletion import delete_post
 from .core.admin import (
     check_admin_pass,
     get_all_threads_for_admin,
-    moderate_thread_action,
     admin_delete_post,
     create_admin_token,
-    verify_admin_token,
-    get_admin_auth,
+    is_admin_cookie_authenticated,
+    check_admin_login_form,
     ban_ip,
     ban_md5,
 )
-from .core.reports import submit_report, get_open_reports, load_reports, update_report_status
-from .utils import hash_deletion_password  # for verifying user deletion passwords against stored hashes (item 5)
-from . import config as config_module  # to expose current_config for post_stuff etc.
+from .core.reports import submit_report, get_open_reports
+from .core.storage import load_thread, save_thread
+from .error_pages import (
+    render_error_page,
+    render_flash_error_page,
+    redirect_to_error_page,
+    wrap_with_error_pages,
+)
+from .http_helpers import apply_security_headers, get_client_ip, safe_user_error
+from .runtime_store import check_rate_limit as shared_check_rate_limit
+from . import config as config_module
 
-# Simple in-memory rate limiter (per-IP, per-process). For higher scale, use Redis or Caddy's rate limiting in front.
-_post_timestamps: dict[str, list[float]] = {}
 
-def _check_rate_limit(ip: str, cfg: Any) -> bool:
-    """Return True if under limit, False if rate limited."""
-    import time
-    now = time.time()
-    window = getattr(cfg, "RATE_LIMIT_WINDOW_SECONDS", 60)
-    max_posts = getattr(cfg, "RATE_LIMIT_POSTS_PER_MIN", 5)
-    if ip not in _post_timestamps:
-        _post_timestamps[ip] = []
-    # prune old timestamps
-    _post_timestamps[ip] = [t for t in _post_timestamps[ip] if now - t < window]
-    if len(_post_timestamps[ip]) >= max_posts:
-        return False
-    _post_timestamps[ip].append(now)
-    return True
+def _check_post_rate_limit(board_dir: Path, ip: str, cfg: Any) -> bool:
+    """Return True if under limit, False if rate limited (shared across workers)."""
+    return shared_check_rate_limit(
+        board_dir,
+        cfg,
+        "posts",
+        ip,
+        max_events=getattr(cfg, "RATE_LIMIT_POSTS_PER_MIN", 5),
+        window_seconds=float(getattr(cfg, "RATE_LIMIT_WINDOW_SECONDS", 60)),
+    )
+
+
+def _check_report_rate_limit(board_dir: Path, ip: str, cfg: Any) -> bool:
+    return shared_check_rate_limit(
+        board_dir,
+        cfg,
+        "reports",
+        ip,
+        max_events=getattr(cfg, "REPORT_RATE_LIMIT_POSTS", 10),
+        window_seconds=float(getattr(cfg, "REPORT_RATE_LIMIT_WINDOW_SECONDS", 300)),
+    )
+
+
+def _secure(resp: Response, cfg: Any) -> Response:
+    return apply_security_headers(resp, cfg)
 
 
 def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: str = "", **cfg_overrides: Any):
@@ -127,7 +145,8 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
     def app(request: Request) -> Response:
         task = request.args.get("task") or request.form.get("task")
         error = None
-        is_admin = get_admin_auth(request, cfg)
+        is_admin = is_admin_cookie_authenticated(request, cfg)
+        client_ip = get_client_ip(request, cfg)
 
         # Support subpath mounting via explicit base_path or SCRIPT_NAME (from DispatcherMiddleware etc.)
         script_root = request.environ.get("SCRIPT_NAME", "") or base_path or ""
@@ -217,10 +236,10 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
             while "//" in effective_path:
                 effective_path = effective_path.replace("//", "/")
 
-            # Handle explicit login POST first (sets the cookie)
-            if request.method == "POST":
+            # Handle explicit login POST first (sets the cookie; password never in query strings)
+            if request.method == "POST" and check_admin_login_form(request, cfg):
                 provided = (request.form.get("admin") or "").strip()
-                if provided and check_admin_pass(provided, cfg):
+                if check_admin_pass(provided, cfg):
                     token = create_admin_token(cfg)
                     csrf_token = __import__("secrets").token_urlsafe(16)
                     resp = Response(status=303, headers={"Location": script_root + "/admin"})
@@ -235,15 +254,15 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                     cookie_path = script_root + "/" if script_root else "/"
                     resp.set_cookie("admin_auth", token, httponly=True, secure=admin_secure, samesite="Lax", max_age=86400, path=cookie_path)
                     resp.set_cookie("admin_csrf", csrf_token, httponly=True, samesite="Lax", max_age=86400, path=cookie_path)
-                    return resp
+                    return _secure(resp, cfg)
 
-            is_admin = get_admin_auth(request, cfg)
+            is_admin = is_admin_cookie_authenticated(request, cfg)
 
             if effective_path == "/admin/logout":
                 resp = Response(status=303, headers={"Location": script_root + "/"})
                 resp.set_cookie("admin_auth", "", expires=0, path=script_root + "/" if script_root else "/")
                 resp.set_cookie("admin_csrf", "", expires=0, path=script_root + "/" if script_root else "/")
-                return resp
+                return _secure(resp, cfg)
 
             if not is_admin:
                 login_html = (
@@ -259,12 +278,36 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                     "Use the same password you configured as ADMIN_PASS.</small></p>"
                     "</body></html>"
                 )
-                resp = Response(login_html, mimetype="text/html")
-                resp.headers["X-Content-Type-Options"] = "nosniff"
-                resp.headers["Referrer-Policy"] = "same-origin"
-                return resp
+                return _secure(Response(login_html, mimetype="text/html"), cfg)
 
             csrf = request.cookies.get("admin_csrf", "")
+
+            # POST moderation actions (dashboard or thread page) — never via GET query strings
+            if request.method == "POST":
+                action = (request.form.get("action") or "").strip()
+                if action:
+                    submitted_csrf = request.form.get("csrf", "")
+                    if submitted_csrf != csrf:
+                        return _secure(Response("CSRF validation failed", status=403), cfg)
+                    ok, err = process_admin_action(
+                        board_dir,
+                        cfg,
+                        action=action,
+                        thread_id_str=request.form.get("thread", ""),
+                        post_num_str=request.form.get("post", ""),
+                        state_str=request.form.get("state", "1"),
+                        report_index_str=request.form.get("index", ""),
+                    )
+                    if not ok:
+                        return _secure(Response(err or "Action failed", status=400), cfg)
+                    redirect_thread = request.form.get("thread", "")
+                    if redirect_thread and action in (
+                        "close", "permasage", "delete", "deletefile", "banmd5",
+                    ):
+                        loc = f"{script_root}/admin/thread/{redirect_thread}"
+                    else:
+                        loc = script_root + "/admin"
+                    return _secure(Response(status=303, headers={"Location": loc}), cfg)
 
             # Thread list via Jinja template (item 2) + CSRF (item 1) + thread # in template
             if effective_path == "/admin" or effective_path == "/admin/":
@@ -289,22 +332,19 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                 except Exception as e:
                     # For debugging template errors, show the real exception
                     html = f"<h1>Admin Dashboard</h1><p>Admin template error: {e}</p><pre>{traceback.format_exc()}</pre>"
-                resp = Response(html, mimetype="text/html")
-                resp.headers["X-Content-Type-Options"] = "nosniff"
-                resp.headers["Referrer-Policy"] = "same-origin"
-                return resp
+                return _secure(Response(html, mimetype="text/html"), cfg)
 
             # Per-thread mod page via Jinja template (item 2). Shows the IP-based unique poster_id.
             if effective_path.startswith("/admin/thread/"):
                 try:
                     thread_id = int(effective_path.split("/admin/thread/")[1].split("?")[0])
                 except Exception:
-                    return Response("Bad thread id", status=400)
+                    return _secure(Response("Bad thread id", status=400), cfg)
 
-                from .core.storage import load_thread
-                thread = load_thread(board_dir / getattr(cfg, "RES_DIR", "res/"), thread_id)
+                res_dir = board_dir / getattr(cfg, "RES_DIR", "res/")
+                thread = load_thread(res_dir, thread_id)
                 if not thread:
-                    return Response("Thread not found", status=404)
+                    return _secure(Response("Thread not found", status=404), cfg)
 
                 # Handle mass actions from checkboxes (POST)
                 if request.method == "POST":
@@ -313,7 +353,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                     csrf_sub = request.form.get("csrf", "")
                     if mass_action and selected:
                         if csrf_sub != csrf:
-                            return Response("CSRF validation failed", status=403)
+                            return _secure(Response("CSRF validation failed", status=403), cfg)
                         res_dir = board_dir / getattr(cfg, "RES_DIR", "res/")
                         thread = load_thread(res_dir, thread_id)  # fresh load
                         if thread:
@@ -334,7 +374,10 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                                     if p.md5:
                                         ban_md5(board_dir, p.md5, reason=f"Mass ban from mod page thread {thread_id}", cfg=cfg)
                             save_thread(thread, res_dir)
-                        return Response(status=303, headers={"Location": f"{script_root}/admin/thread/{thread_id}?csrf={csrf}"})
+                        return _secure(
+                            Response(status=303, headers={"Location": f"{script_root}/admin/thread/{thread_id}"}),
+                            cfg,
+                        )
 
                 try:
                     tmpl = jinja_env.get_template("admin/thread.html")
@@ -353,128 +396,43 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                     )
                 except Exception as e:
                     html = f"<h1>Mod #{thread_id}</h1><p>Admin thread template error: {e}</p><pre>{traceback.format_exc()}</pre>"
-                resp = Response(html, mimetype="text/html")
-                resp.headers["X-Content-Type-Options"] = "nosniff"
-                resp.headers["Referrer-Policy"] = "same-origin"
-                return resp
+                return _secure(Response(html, mimetype="text/html"), cfg)
 
-            # Handle admin actions (item 1: basic CSRF via query for current links)
-            action = request.args.get("action")
-            thread_id_str = request.args.get("thread")
-            post_num_str = request.args.get("post")
-            submitted_csrf = request.args.get("csrf", "")
+        # === DELETION (POST only — password never in URL/logs) ===
+        if task == "delete" and request.method != "POST":
+            return _secure(Response("Deletion requires POST.", status=405), cfg)
 
-            ALLOWED_ACTIONS = {"close", "permasage", "delete", "deletefile", "banmd5", "report_handled"}
-
-            if action and action not in ALLOWED_ACTIONS:
-                return Response("Unknown action", status=400)
-
-            if action and submitted_csrf != csrf:
-                return Response("CSRF validation failed", status=403)
-
-            if action in ("close", "permasage") and thread_id_str:
-                try:
-                    tid = int(thread_id_str)
-                    state = request.args.get("state", "1") == "1"
-                    moderate_thread_action(board_dir, tid, action, state, cfg)
-                except ValueError:
-                    return Response("Bad thread id", status=400)
-
-            elif action in ("delete", "deletefile") and thread_id_str and post_num_str:
-                try:
-                    tid = int(thread_id_str)
-                    pid = int(post_num_str)
-                    file_only = action == "deletefile"
-                    admin_delete_post(board_dir, tid, pid, file_only=file_only, cfg=cfg)
-                except ValueError:
-                    return Response("Bad id", status=400)
-
-            elif action == "banmd5" and thread_id_str and post_num_str:
-                try:
-                    tid = int(thread_id_str)
-                    pid = int(post_num_str)
-                    res_dir = board_dir / getattr(cfg, "RES_DIR", "res/")
-                    from .core.storage import load_thread, save_thread
-                    thread = load_thread(res_dir, tid)
-                    if thread:
-                        post = thread.get_post(pid)
-                        if post and post.md5:
-                            banned_file = board_dir / getattr(cfg, "BANNED_MD5_FILE", "banned_md5.txt")
-                            banned_file.parent.mkdir(parents=True, exist_ok=True)
-                            import time as _time
-                            with open(banned_file, "a", encoding="utf-8") as f:
-                                f.write(f"{post.md5}  # permabanned {_time.strftime('%Y-%m-%d %H:%M')} thread {tid} post {pid}\n")
-                            # Also remove the current file (like deletefile)
-                            if post.image:
-                                img_path = board_dir / post.image
-                                if img_path.exists():
-                                    img_path.unlink()
-                                if post.thumbnail:
-                                    tpath = board_dir / post.thumbnail
-                                    if tpath.exists():
-                                        tpath.unlink()
-                                post.image = None
-                                post.thumbnail = None
-                            save_thread(thread, res_dir)
-                except ValueError:
-                    return Response("Bad id", status=400)
-
-            elif action == "report_handled":
-                try:
-                    report_index = int(request.args.get("index", -1))
-                    if 0 <= report_index:
-                        update_report_status(board_dir, report_index, "handled")
-                except ValueError:
-                    pass
-
-            # Redirect
-            location = script_root + "/admin"
-            if thread_id_str and action in ("close", "permasage", "delete", "deletefile", "banmd5"):
-                location = f"{script_root}/admin/thread/{thread_id_str}"
-            return Response(status=303, headers={"Location": location})
-
-        # === DELETION (basic) ===
-        if task == "delete":
+        if request.method == "POST" and task == "delete":
             try:
-                raw = (request.args.get("delete") or "").strip()
+                raw = (request.form.get("delete") or "").strip()
                 if "," not in raw:
                     raise ValueError("bad delete param")
                 thread_id_str, post_num_str = raw.split(",", 1)
                 tid = int(thread_id_str)
                 pid = int(post_num_str)
-                provided_pass = (request.args.get("password") or "").strip()
+                provided_pass = (request.form.get("password") or "").strip()
+                file_only = request.form.get("fileonly") in ("1", "true", "yes", "on")
 
-                # Verify deletion password hash if the post has one (item 5)
-                # Load post to check delpass_hash (only for user path; admin uses separate call)
-                from .core.storage import load_thread as _load_thread
-                res_dir = board_dir / getattr(cfg, "RES_DIR", "res/")
-                th = _load_thread(res_dir, tid)
-                if th:
-                    p = th.get_post(pid)
-                    if p and p.delpass_hash:
-                        expected = hash_deletion_password(provided_pass, getattr(cfg, "SECRET", ""))
-                        if not expected or not __import__("hmac").compare_digest(expected, p.delpass_hash):
-                            error = "Incorrect deletion password."
-                            # fall through to show error on page
-                            # (we don't call delete)
-                            # For simplicity, we skip the delete call below if mismatch
-                            ref = request.referrer or "/"
-                            # To show error we set it and continue, but for now just redirect or error
-                            # Simpler: raise to the generic handler
-                            raise ValueError("bad deletion password")
-
-                delete_post(
+                secret = getattr(cfg, "SECRET", "")
+                if not delete_post(
                     board_dir,
                     tid,
                     pid,
                     password=provided_pass,
-                    file_only=bool(request.args.get("fileonly")),
-                )
-                ref = request.referrer or "/"
-                return Response(status=303, headers={"Location": ref})
+                    file_only=file_only,
+                    secret=secret,
+                    cfg=cfg,
+                ):
+                    raise ValueError("bad deletion password")
+
+                ref = request.referrer or script_root + "/"
+                return _secure(Response(status=303, headers={"Location": ref}), cfg)
             except Exception as e:
-                # Do not leak full exception details to the user
-                error = "Delete failed." if "password" not in str(e).lower() else "Incorrect deletion password."
+                return redirect_to_error_page(
+                    script_root,
+                    safe_user_error(e, context="delete"),
+                    cfg,
+                )
 
         # === REPORT POST ===
         if task == "report":
@@ -482,8 +440,10 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                 try:
                     reason = (request.form.get("reason") or "").strip()
                     # Basic sanitization / limits for reports (they are shown to admins)
+                    if not _check_report_rate_limit(board_dir, client_ip, cfg):
+                        return _secure(Response("Too many reports. Please wait.", status=429), cfg)
                     if not reason:
-                        return Response("Reason is required", status=400)
+                        return _secure(Response("Reason is required", status=400), cfg)
                     if len(reason) > 2000:
                         reason = reason[:2000]
                     # The reason will be stored raw and later escaped when rendered in admin UI.
@@ -506,23 +466,23 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                         except:
                             continue
 
-                    ip = request.remote_addr or "unknown"
                     for t_id, p_num in reports_to_submit:
-                        submit_report(board_dir, t_id, p_num, reason, ip)
+                        submit_report(board_dir, t_id, p_num, reason, client_ip)
 
-                    return Response(
+                    return _secure(Response(
                         "<html><body><h2>Report(s) submitted. Thank you.</h2>"
-                        "<p><a href='javascript:window.close()'>Close window</a> or <a href='javascript:history.back()'>Go back</a></p></body></html>",
-                        mimetype="text/html"
-                    )
-                except Exception as e:
-                    return Response(f"Report failed: {e}", status=400)
+                        "<p><a href='#' onclick='window.close();return false;'>Close window</a> "
+                        "or <a href='#' onclick='history.back();return false;'>Go back</a></p></body></html>",
+                        mimetype="text/html",
+                    ), cfg)
+                except Exception:
+                    return _secure(Response("Report failed.", status=400), cfg)
 
             # Show report form (GET) - for individual reports via link
             thread_id = (request.args.get("thread") or "").strip()
             post_num = (request.args.get("post") or "").strip()
             if not thread_id or not post_num:
-                return Response("Missing thread or post", status=400)
+                return _secure(Response("Missing thread or post", status=400), cfg)
 
             # Escape even though they should be numeric (defense in depth)
             safe_tid = html_escape(thread_id)
@@ -540,22 +500,30 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
             </form>
             </body></html>
             """
-            return Response(form_html, mimetype="text/html")
+            return _secure(Response(form_html, mimetype="text/html"), cfg)
+
+        # === USER-FACING ERROR PAGE (flash redirect target) ===
+        if effective_path.rstrip("/") == "/error":
+            return render_flash_error_page(request, jinja_env, cfg, script_root)
 
         # === POSTING ===
         if request.method == "POST" and task == "post":
+            tmp_path = None
+            upload_name = None
             try:
-                # In blog mode, only admins (via cookie) can create new entries.
-                # Regular users can still comment if BLOG_COMMENTS allows.
                 board_mode = getattr(cfg, "BOARD_MODE", "imageboard")
-                if board_mode == "blog" and not is_admin:
-                    raise PostError("Only administrators can create new blog entries.")
-
                 blog_comments = getattr(cfg, "BLOG_COMMENTS", "enabled") if board_mode == "blog" else "enabled"
+                is_reply = bool(request.form.get("thread"))
+
+                # Blog: only admins may create new entries; comments follow BLOG_COMMENTS
+                if board_mode == "blog":
+                    if not is_reply and not is_admin:
+                        raise PostError("Only administrators can create new blog entries.")
+                    if is_reply and blog_comments == "disabled":
+                        raise PostError("Comments are disabled on this blog.")
 
                 # Rate limiting (quick win for public deploys)
-                client_ip = request.remote_addr or "127.0.0.1"
-                if not _check_rate_limit(client_ip, cfg):
+                if not _check_post_rate_limit(board_dir, client_ip, cfg):
                     raise PostError("Rate limit exceeded. Please wait a minute before posting again.")
 
                 # CSRF check for public posts (quick win)
@@ -573,8 +541,6 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
 
                 # Save uploaded file temporarily
                 uploaded_file = request.files.get("file")
-                tmp_path = None
-                upload_name = None
                 if uploaded_file and uploaded_file.filename:
                     import tempfile
                     # SECURITY: Never trust the original filename for paths.
@@ -619,7 +585,9 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                         ctoken = request.form.get("captcha_token", "")
                         cans = request.form.get("captcha", "") or ""
                         from .captcha import validate_captcha
-                        if not validate_captcha(ctoken, cans):
+                        if not validate_captcha(
+                            ctoken, cans, board_dir=board_dir, cfg=cfg
+                        ):
                             raise PostError("Incorrect or expired captcha.")
 
                 # For blog mode, default to Admin name (and capcode badge if configured) when using admin cookie
@@ -642,7 +610,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                     password=del_password,  # deletion password (auto-generated 8 chars if empty; tied to cookie)
                     file_path=tmp_path,
                     upload_filename=upload_name,
-                    ip=request.remote_addr or "127.0.0.1",
+                    ip=client_ip,
                     mode=mode,
                     honeypot_email=request.form.get("email", ""),
                     honeypot_url=request.form.get("url", ""),
@@ -661,62 +629,16 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                 resp = Response(status=303, headers={"Location": loc})
                 if del_password:
                     resp.set_cookie("delpass", del_password, httponly=True, samesite="Lax", max_age=86400*365, path=script_root + "/" if script_root else "/")
-                return resp
+                return _secure(resp, cfg)
 
             except Exception as e:
-                error = str(e)
                 if tmp_path:
                     Path(tmp_path).unlink(missing_ok=True)
-
-        # If posting failed on a *reply* (thread param was present), re-render the
-        # original thread page with the error message and a fresh form (including captcha).
-        # This keeps the user on the same page instead of dumping them on the index.
-        if error and request.form.get("thread"):
-            try:
-                thread_id = int(request.form.get("thread"))
-                from .core.storage import load_thread
-                res_dir = board_dir / getattr(cfg, "RES_DIR", "res/")
-                thread = load_thread(res_dir, thread_id)
-                if thread:
-                    bmode = getattr(cfg, "BOARD_MODE", "imageboard")
-                    enable_captcha = getattr(cfg, "ENABLE_CAPTCHA", False)
-                    captcha_token = captcha_image = None
-                    if enable_captcha:
-                        from .captcha import create_captcha
-                        captcha_token, captcha_image = create_captcha(
-                            difficulty=getattr(cfg, "CAPTCHA_DIFFICULTY", 0.6)
-                        )
-                    tmpl_prefix = "image"
-                    try:
-                        template = jinja_env.get_template(f"{tmpl_prefix}/thread.html")
-                    except Exception:
-                        template = jinja_env.get_template("image/thread.html")
-                    html = template.render(
-                        title=cfg.TITLE,
-                        thread=thread,
-                        allow_images=getattr(cfg, "ALLOW_IMAGE_REPLIES", True),
-                        mode=bmode,
-                        initial_theme_css=initial_theme_css,
-                        default_style=default_style_name,
-                        error=error,
-                        enable_captcha=enable_captcha,
-                        captcha_token=captcha_token,
-                        captcha_image=captcha_image,
-                        csrf_token=public_csrf,
-                        default_delpass=default_delpass,
-                        script_root=script_root,
-                    )
-                    resp = Response(html, mimetype="text/html")
-                    if not request.cookies.get("csrf_token"):
-                        resp.set_cookie("csrf_token", public_csrf, httponly=True, samesite="Lax", max_age=86400*30, path="/")
-                    if newly_created_delpass:
-                        resp.set_cookie("delpass", default_delpass, httponly=True, samesite="Lax", max_age=86400*365, path="/")
-                    resp.headers["X-Content-Type-Options"] = "nosniff"
-                    resp.headers["Referrer-Policy"] = "same-origin"
-                    return resp
-            except Exception:
-                # Fall through to normal (front page) error display
-                pass
+                return redirect_to_error_page(
+                    script_root,
+                    safe_user_error(e),
+                    cfg,
+                )
 
         # === FRONT PAGE ===
         if effective_path in ("/", "/index.html"):
@@ -786,8 +708,12 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
             if enable_captcha:
                 from .captcha import create_captcha
                 captcha_token, captcha_image = create_captcha(
-                    difficulty=getattr(cfg, "CAPTCHA_DIFFICULTY", 0.6)
+                    difficulty=getattr(cfg, "CAPTCHA_DIFFICULTY", 0.6),
+                    board_dir=board_dir,
+                    cfg=cfg,
                 )
+
+            blog_comments = getattr(cfg, "BLOG_COMMENTS", "enabled") if bmode == "blog" else "enabled"
 
             html = template.render(
                 title=cfg.TITLE,
@@ -798,6 +724,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                 threads=display_threads,
                 error=error,
                 mode=bmode,
+                blog_comments=blog_comments,
                 initial_theme_css=initial_theme_css,
                 default_style=default_style_name,
                 enable_captcha=enable_captcha,
@@ -813,9 +740,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                 resp.set_cookie("csrf_token", public_csrf, httponly=True, samesite="Lax", max_age=86400*30, path=script_root + "/" if script_root else "/")
             if newly_created_delpass:
                 resp.set_cookie("delpass", default_delpass, httponly=True, samesite="Lax", max_age=86400*365, path=script_root + "/" if script_root else "/")
-            resp.headers["X-Content-Type-Options"] = "nosniff"
-            resp.headers["Referrer-Policy"] = "same-origin"
-            return resp
+            return _secure(resp, cfg)
 
         # === CATALOG VIEW ===
         # imageboard / textboard: classic 4chan-style grid (thumbnails or "No image" + short teasers, lasthit order)
@@ -823,7 +748,10 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
         if effective_path.rstrip("/") in ("/catalog", "/catalog.html"):
             bmode = getattr(cfg, "BOARD_MODE", "imageboard")
             if bmode not in ("imageboard", "textboard", "blog"):
-                return Response("Catalog is only available in imageboard, textboard, and blog modes.", status=404)
+                return _secure(
+                    Response("Catalog is only available in imageboard, textboard, and blog modes.", status=404),
+                    cfg,
+                )
             from .core.storage import list_threads as list_t, load_thread
             res_dir = board_dir / getattr(cfg, "RES_DIR", "res/")
 
@@ -892,7 +820,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                 default_style=default_style_name,
                 script_root=script_root,
             )
-            return Response(html, mimetype="text/html")
+            return _secure(Response(html, mimetype="text/html"), cfg)
 
         # === THREAD VIEW ===
         # Match /12345/ or /12345
@@ -903,7 +831,7 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
             res_dir = board_dir / getattr(cfg, "RES_DIR", "res/")
             thread = load_thread(res_dir, thread_id)
             if not thread:
-                return Response("Thread not found", status=404)
+                return _secure(Response("Thread not found", status=404), cfg)
 
             bmode = getattr(cfg, "BOARD_MODE", "imageboard")
             allow_images = getattr(cfg, "ALLOW_IMAGE_REPLIES", True)
@@ -920,7 +848,9 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
             if enable_captcha:
                 from .captcha import create_captcha
                 captcha_token, captcha_image = create_captcha(
-                    difficulty=getattr(cfg, "CAPTCHA_DIFFICULTY", 0.6)
+                    difficulty=getattr(cfg, "CAPTCHA_DIFFICULTY", 0.6),
+                    board_dir=board_dir,
+                    cfg=cfg,
                 )
 
             # For blog mode, control comment form based on BLOG_COMMENTS
@@ -950,11 +880,16 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
                 resp.set_cookie("csrf_token", public_csrf, httponly=True, samesite="Lax", max_age=86400*30, path=script_root + "/" if script_root else "/")
             if newly_created_delpass:
                 resp.set_cookie("delpass", default_delpass, httponly=True, samesite="Lax", max_age=86400*365, path=script_root + "/" if script_root else "/")
-            resp.headers["X-Content-Type-Options"] = "nosniff"
-            resp.headers["Referrer-Policy"] = "same-origin"
-            return resp
+            return _secure(resp, cfg)
 
-        return Response("Not found", status=404)
+        return render_error_page(
+            jinja_env,
+            cfg,
+            status=404,
+            heading="Page not found",
+            message="The page you requested does not exist.",
+            script_root=script_root,
+        )
 
     # Use proper SharedDataMiddleware for serving board static files (src/, thumb/, css/, etc.)
     # This is much more reliable than manual handling inside the view.
@@ -983,6 +918,20 @@ def make_app(board_dir: str | Path = ".", mode: str | None = None, base_path: st
         '/': pkg_static,  # fallback for kareha.js etc. if not in board
     })
 
+    # Trust X-Forwarded-For / X-Forwarded-Proto from Caddy (TRUSTED_PROXY_COUNT hops, default 1)
+    trusted = int(getattr(cfg, "TRUSTED_PROXY_COUNT", 0) or 0)
+    if trusted > 0:
+        wrapped = ProxyFix(wrapped, x_for=trusted, x_proto=1, x_host=0, x_prefix=1)
+
+    # Catch-all HTML error pages for unhandled exceptions (logs full traceback server-side)
+    wrapped = wrap_with_error_pages(
+        wrapped,
+        cfg=cfg,
+        jinja_env=jinja_env,
+        board_dir=board_dir,
+        base_path=base_path,
+    )
+
     # Attach for introspection (on the final wsgi callable)
     wrapped.cfg = cfg
     wrapped.board_dir = board_dir
@@ -1000,7 +949,7 @@ def main():
     app = make_app(board, mode)
     shown = mode or "(from BOARD_MODE in config.py or default)"
     print(f"Running Kareha on http://127.0.0.1:8000 (mode={shown})")
-    run_simple("127.0.0.1", 8000, app, use_reloader=True, use_debugger=True)
+    run_simple("127.0.0.1", 8000, app, use_reloader=True, use_debugger=False)
 
 
 if __name__ == "__main__":

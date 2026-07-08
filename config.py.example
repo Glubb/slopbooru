@@ -29,8 +29,17 @@ SECRET = "put a long random string here - at least 32 chars, never reuse"
 # Board mode (hybrid: set here, or override with CLI / make_app arg).
 # BOARD_MODE = "imageboard"   # default - full images, grid catalog, classic layout
 # BOARD_MODE = "textboard"    # or "text" / "message" - text only, but still has grid catalog
-# BOARD_MODE = "blog"         # admin-only entries (via cookie), flat dated list + linear catalog,
-#                             # images allowed on entries (BLOG_COMMENTS controls comments)
+# BOARD_MODE = "blog"         # admin-only entries (via cookie), flat dated list + linear catalog
+#
+# Blog comments (only applies when BOARD_MODE = "blog"):
+# BLOG_COMMENTS = "enabled"    # default — visitors can comment on entries (reply form on thread pages)
+# BLOG_COMMENTS = "disabled"   # hide comment forms; only admins post new entries
+# BLOG_COMMENTS = "text_only"  # comments allowed but no image/file uploads on replies
 #
 # The explicit --mode flag to `kareha serve` (or mode= to make_app) always wins
 # over the value in this file. Aliases are accepted in either location.
+
+# Production behind Caddy/nginx (default 1 — one reverse proxy hop)
+# TRUSTED_PROXY_COUNT = 1
+
+# Optional: ENABLE_CAPTCHA = True  (works across gunicorn workers via .runtime/)

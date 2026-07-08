@@ -26,8 +26,8 @@ from urllib.parse import quote
 # ---------------------------------------------------------------------------
 
 def protocol_regexp() -> str:
-    """Returns regex fragment matching allowed protocols for links."""
-    return r"(?:https?|ftp|mailto|javascript):"
+    """Returns regex fragment matching allowed protocols for links (no javascript:)."""
+    return r"(?:https?|ftp|mailto):"
 
 
 def url_regexp() -> re.Pattern:

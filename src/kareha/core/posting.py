@@ -15,6 +15,7 @@ from ..image import analyze_image, compute_md5, make_thumbnail, get_file_icon
 from ..markup import format_comment
 from ..spam import spam_engine
 from ..utils import make_id_code, make_poster_id, hash_deletion_password, process_tripcode, make_anonymous, make_date
+from .admin import is_ip_banned
 from .models import Post, Thread
 from .storage import load_thread, save_thread, list_threads, get_next_post_num, save_post_num
 
@@ -57,6 +58,9 @@ def post_stuff(
     """
     cfg = _get_cfg()
     res_dir = Path(board_dir) / getattr(cfg, "RES_DIR", "res/")
+
+    if is_ip_banned(ip, board_dir, cfg):
+        raise PostError("You are banned from posting on this board.")
 
     # Basic validation
     if not comment.strip() and not file_path:

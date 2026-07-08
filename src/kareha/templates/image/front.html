@@ -138,7 +138,9 @@
 {% if subtitle %}<p style="text-align:center; color:#666; margin:0 0 0.5em 0; font-size:1.1em;">{{ subtitle }}</p>{% endif %}
 <p style="text-align:center; font-size:10pt; margin: 4px 0 12px;">[<a href="{{ script_root }}/">Index</a>]{% if mode in ("imageboard", "textboard", "blog") %} [<a href="{{ script_root }}/catalog">Catalog</a>]{% endif %}</p>
 
-{% if error %}<p style="color:red"><strong>Error:</strong> {{ error }}</p>{% endif %}
+{% if mode == "blog" and blog_comments == "disabled" %}
+<p style="text-align:center; color:#666; font-size:0.95em;">Comments are disabled on this blog.</p>
+{% endif %}
 
 {% if mode != "blog" or is_admin %}
 <form id="postform" method="post" action="{{ script_root }}/?task=post" enctype="multipart/form-data">

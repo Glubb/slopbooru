@@ -55,10 +55,6 @@ def load_config(user_config_path: str | Path | None = None, mode: str | None = N
             for k in dir(user_mod):
                 if k.isupper() and not k.startswith("_"):
                     cfg[k] = getattr(user_mod, k)
-            # Debug for capped trips etc.
-            if "CAPPED_TRIPS" in cfg:
-                print(f"[CONFIG LOAD] CAPPED_TRIPS loaded as: {cfg['CAPPED_TRIPS']}")
-
     # === Hybrid mode selection ===
     # Explicit arg (CLI or make_app call) wins as an override.
     # Otherwise fall back to whatever the user put in their config.py (BOARD_MODE),
@@ -84,6 +80,14 @@ def load_config(user_config_path: str | Path | None = None, mode: str | None = N
     # Mode adjustments (may override some things the user set, or fill gaps).
     # We pass the canonical board_mode.
     config_defaults.apply_mode_defaults(board_mode, cfg)
+
+    # Normalize blog comment mode (enabled | disabled | text_only)
+    _bc = (cfg.get("BLOG_COMMENTS") or "enabled").lower().strip()
+    if _bc in ("off", "false", "no", "0", "none"):
+        _bc = "disabled"
+    elif _bc not in ("enabled", "disabled", "text_only"):
+        _bc = "enabled"
+    cfg["BLOG_COMMENTS"] = _bc
 
     # Basic validation
     if not cfg.get("ADMIN_PASS") or cfg["ADMIN_PASS"] == "CHANGEME":
