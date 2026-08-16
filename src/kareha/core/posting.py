@@ -11,13 +11,21 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .. import config as config_module
+from ..filelock import storage_lock
 from ..image import analyze_image, compute_md5, make_thumbnail, get_file_icon
 from ..markup import format_comment
 from ..spam import spam_engine
 from ..utils import make_id_code, make_poster_id, hash_deletion_password, process_tripcode, make_anonymous, make_date
 from .admin import is_ip_banned
 from .models import Post, Thread
-from .storage import load_thread, save_thread, list_threads, get_next_post_num, save_post_num
+from .storage import (
+    delete_thread,
+    get_next_post_num,
+    list_threads,
+    load_thread,
+    save_post_num,
+    save_thread,
+)
 
 
 class PostError(Exception):
@@ -206,16 +214,8 @@ def post_stuff(
             md5 = compute_md5(file_path)
 
             # Image ban list by MD5 (anti-abuse for illegal/unwanted content)
-            if md5:
-                banned_file = Path(board_dir) / getattr(cfg, "BANNED_MD5_FILE", "banned_md5.txt")
-                if banned_file.exists():
-                    try:
-                        banned = {line.strip().lower() for line in banned_file.read_text(encoding="utf-8", errors="ignore").splitlines()
-                                  if line.strip() and not line.strip().startswith('#')}
-                        if md5.lower() in banned:
-                            raise PostError("This image has been banned.")
-                    except Exception:
-                        pass  # don't let ban file errors block posting
+            if md5 and _md5_is_banned(board_dir, cfg, md5):
+                raise PostError("This image has been banned.")
 
             duplicate_post = None
             if md5:
@@ -286,36 +286,52 @@ def post_stuff(
                     "md5": md5 or "",
                 }
 
-    # Create or append to thread
-    if thread_id:
-        thread = load_thread(res_dir, thread_id)
-        if not thread:
-            raise PostError("Thread not found.")
-        if thread.closed:
-            raise PostError("Thread is closed.")
+    # Create or append to thread (single lock: number + JSON write)
+    with storage_lock(res_dir):
+        if thread_id:
+            thread = load_thread(res_dir, thread_id)
+            if not thread:
+                raise PostError("Thread not found.")
+            if thread.closed or _should_autoclose(thread, res_dir, cfg, now):
+                if not thread.closed:
+                    thread.closed = True
+                    save_thread(thread, res_dir)
+                raise PostError("Thread is closed.")
 
-        num = get_next_post_num(res_dir)
-        post = Post(
-            num=num,
-            name=name,
-            trip=trip,
-            link=link,
-            date=date,
-            comment_html=format_comment(comment, markup, str(thread_id), getattr(cfg, "ALLOWED_HTML", {})),
-            comment_raw=comment,
-            poster_id=poster_id,
-            delpass_hash=delpass_hash,
-            capcode=capcode,
-            ip=ip,
-            **(image_info or {}),
-        )
-        thread.add_post(post)
-        thread.lasthit = now
-        thread.lastmod = now
-        save_thread(thread, res_dir)
-        save_post_num(res_dir, num)
-        return num
-    else:
+            max_posts = int(getattr(cfg, "MAX_POSTS", 0) or 0)
+            if max_posts and thread.postcount >= max_posts and not thread.pinned:
+                thread.closed = True
+                save_thread(thread, res_dir)
+                raise PostError("Thread is closed.")
+
+            num = get_next_post_num(res_dir)
+            post = Post(
+                num=num,
+                name=name,
+                trip=trip,
+                link=link,
+                date=date,
+                comment_html=format_comment(comment, markup, str(thread_id), getattr(cfg, "ALLOWED_HTML", {})),
+                comment_raw=comment,
+                poster_id=poster_id,
+                delpass_hash=delpass_hash,
+                capcode=capcode,
+                ip=ip,
+                **(image_info or {}),
+            )
+            thread.add_post(post)
+            if not thread.permasage:
+                thread.lasthit = now
+            thread.lastmod = now
+            if (not thread.pinned) and (
+                _should_autoclose(thread, res_dir, cfg, now)
+                or (max_posts and thread.postcount >= max_posts)
+            ):
+                thread.closed = True
+            save_thread(thread, res_dir)
+            save_post_num(res_dir, num)
+            return num
+
         # New thread
         board_mode = getattr(cfg, "BOARD_MODE", "")
         if (getattr(cfg, "REQUIRE_THREAD_TITLE", False) or board_mode == "blog") and not title.strip():
@@ -328,6 +344,7 @@ def post_stuff(
             author=name + trip,
             lasthit=now,
             lastmod=now,
+            created=now,
         )
         post = Post(
             num=num,
@@ -346,10 +363,109 @@ def post_stuff(
         new_thread.add_post(post)
         save_thread(new_thread, res_dir)
         save_post_num(res_dir, num)
+        trim_threads(board_dir, cfg)
         return num
 
 
+def _md5_is_banned(board_dir: Path, cfg: Any, md5: str) -> bool:
+    banned_file = Path(board_dir) / getattr(cfg, "BANNED_MD5_FILE", "banned_md5.txt")
+    if not banned_file.exists():
+        return False
+    try:
+        banned = {
+            line.strip().split()[0].lower()
+            for line in banned_file.read_text(encoding="utf-8", errors="ignore").splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        }
+    except OSError:
+        return False
+    return md5.lower() in banned
+
+
+def thread_created_ts(thread: Thread) -> int:
+    if thread.created:
+        return int(thread.created)
+    if thread.thread >= 100_000_000:
+        return int(thread.thread)
+    return int(thread.lastmod or thread.lasthit or 0)
+
+
+def _should_autoclose(thread: Thread, res_dir: Path, cfg: Any, now: int) -> bool:
+    if getattr(thread, "pinned", False):
+        return False
+    ac_posts = int(getattr(cfg, "AUTOCLOSE_POSTS", 0) or 0)
+    if ac_posts and thread.postcount >= ac_posts:
+        return True
+    ac_days = int(getattr(cfg, "AUTOCLOSE_DAYS", 0) or 0)
+    if ac_days:
+        created = thread_created_ts(thread)
+        if created and now - created >= ac_days * 86400:
+            return True
+    ac_size = int(getattr(cfg, "AUTOCLOSE_SIZE", 0) or 0)
+    if ac_size:
+        path = Path(thread.filename) if thread.filename else Path(res_dir) / f"{thread.thread}.json"
+        try:
+            if path.exists() and path.stat().st_size >= ac_size * 1024:
+                return True
+        except OSError:
+            pass
+    return False
+
+
+def _dir_size_bytes(path: Path) -> int:
+    if not path.exists():
+        return 0
+    total = 0
+    for p in path.rglob("*"):
+        try:
+            if p.is_file():
+                total += p.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
 def trim_threads(board_dir: Path, cfg: Any = None) -> None:
-    """Stub for now — real trimming logic (MAX_THREADS, AUTOCLOSE_*, etc.) will go here."""
-    # Placeholder for PR 5 completion
-    pass
+    """
+    Enforce MAX_THREADS / MAX_MEGABYTES by deleting overflow threads.
+
+    TRIM_METHOD 0 (default): drop least-recently-bumped (tail of lasthit order).
+    TRIM_METHOD 1: drop oldest by creation time.
+    Caller should already hold storage_lock when used from post_stuff.
+    """
+    cfg = cfg or _get_cfg()
+    res_dir = Path(board_dir) / getattr(cfg, "RES_DIR", "res/")
+    max_threads = int(getattr(cfg, "MAX_THREADS", 0) or 0)
+    trim_method = int(getattr(cfg, "TRIM_METHOD", 0) or 0)
+
+    metas = list_threads(res_dir, sort_by="lasthit")
+    unpinned = [m for m in metas if not m.get("pinned")]
+    to_delete: list[int] = []
+
+    if max_threads > 0 and len(unpinned) > max_threads:
+        overflow = len(unpinned) - max_threads
+        if trim_method == 1:
+            oldest = sorted(unpinned, key=lambda x: (x.get("created") or 0, x.get("thread") or 0))
+            to_delete.extend(int(m["thread"]) for m in oldest[:overflow])
+        else:
+            to_delete.extend(int(m["thread"]) for m in unpinned[max_threads:])
+
+    max_mb = int(getattr(cfg, "MAX_MEGABYTES", 0) or 0)
+    if max_mb > 0:
+        limit = max_mb * 1024 * 1024
+        img_dir = Path(board_dir) / getattr(cfg, "IMG_DIR", "src/")
+        thumb_dir = Path(board_dir) / getattr(cfg, "THUMB_DIR", "thumb/")
+        # Drop least-recently-bumped unpinned threads until under the cap.
+        remaining = [m for m in unpinned if int(m["thread"]) not in to_delete]
+        while remaining and (
+            _dir_size_bytes(res_dir) + _dir_size_bytes(img_dir) + _dir_size_bytes(thumb_dir)
+        ) > limit:
+            victim = remaining.pop()
+            tid = int(victim["thread"])
+            if tid not in to_delete:
+                to_delete.append(tid)
+            if len(remaining) <= 1:
+                break
+
+    for tid in to_delete:
+        delete_thread(res_dir, tid, board_dir=board_dir)

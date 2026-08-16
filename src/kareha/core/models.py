@@ -60,8 +60,10 @@ class Thread:
     postcount: int = 0
     lasthit: int = 0
     lastmod: int = 0
+    created: int = 0            # unix time at thread creation (for AUTOCLOSE_DAYS)
     permasage: bool = False
     closed: bool = False
+    pinned: bool = False        # sticky OP: listed first, never trimmed/autoclose
 
     posts: list[Post] = field(default_factory=list)
 

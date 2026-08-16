@@ -115,6 +115,18 @@
       font-weight: bold;
       display: block;
     }
+    .pin-label {
+      font-weight: bold;
+      color: #00a;
+      margin-right: 4px;
+    }
+    .capcode,
+    .capcode.admin,
+    .postername.admin {
+      color: #e00000;
+      font-weight: bold;
+      font-size: 1.15em;
+    }
 
     /* Quote/reply links like 4chan/vichan */
     a.quotelink {
@@ -130,6 +142,15 @@
     }
     a.quotejs:hover {
       text-decoration: underline;
+    }
+
+    .pager {
+      text-align: center;
+      font-size: 10pt;
+      margin: 16px 0 8px;
+    }
+    .pager a, .pager strong {
+      margin: 0 3px;
     }
   </style>
 </head>
@@ -197,10 +218,11 @@
 
       <div class="postInfo desktop">
         <a name="{{ t.op.num }}"></a>
+        {% if t.pinned %}<span class="pin-label">📌 Pinned</span>{% endif %}
         {% if t.title %}
         <span class="subject">{{ t.title }}</span>
         {% endif %}
-        <span class="postername">{{ t.op.name }}</span>
+        <span class="postername{% if t.op.capcode or t.op.name == 'Admin' %} admin{% endif %}">{{ t.op.name }}</span>
         {% if t.op.capcode %}
           {{ t.op.capcode | safe }}
         {% elif t.op.trip %}
@@ -219,7 +241,8 @@
 
       {% if t.omitted > 0 %}
         <div class="omitted">
-          {{ t.omitted }} posts omitted. <a href="{{ script_root }}/{{ t.thread }}/">Click here</a> to view.
+          {{ t.omitted }} {% if mode == "blog" %}comment{{ "s" if t.omitted != 1 else "" }}{% else %}posts{% endif %} omitted.
+          <a href="{{ script_root }}/{{ t.thread }}/">Click here</a> to view.
         </div>
       {% endif %}
     </div>
@@ -248,7 +271,7 @@
 
       <div class="postInfo desktop">
         <a name="{{ r.num }}"></a>
-        <span class="postername">{{ r.name }}</span>
+        <span class="postername{% if r.capcode or r.name == 'Admin' %} admin{% endif %}">{{ r.name }}</span>
         {% if r.capcode %}
           {{ r.capcode | safe }}
         {% elif r.trip %}
@@ -271,8 +294,26 @@
 <p>No threads yet. Be the first to post!</p>
 {% endfor %}
 
+{% if pager and pager.pages > 1 %}
+<p class="pager">
+  {% if pager.has_prev %}
+    <a href="{{ page_href(pager.page - 1) }}">◀</a>
+  {% endif %}
+  {% for n in range(1, pager.pages + 1) %}
+    {% if n == pager.page %}
+      <strong>[{{ n }}]</strong>
+    {% else %}
+      <a href="{{ page_href(n) }}">[{{ n }}]</a>
+    {% endif %}
+  {% endfor %}
+  {% if pager.has_next %}
+    <a href="{{ page_href(pager.page + 1) }}">▶</a>
+  {% endif %}
+</p>
+{% endif %}
+
 <!-- Theme Switcher - Bottom Right -->
-<div id="theme-switcher" style="position: fixed; bottom: 8px; right: 8px; background: #fff; border: 1px solid #888; padding: 4px 8px; font-size: 12px; z-index: 9999;">
+<div id="theme-switcher" style="position: fixed; bottom: 8px; right: 8px; padding: 4px 8px; font-size: 12px; z-index: 9999;">
   <label>Theme:
     <select id="theme-select" onchange="setTheme(this.value)">
       <option value="burichan">Burichan</option>
@@ -280,6 +321,7 @@
       <option value="futaba">Futaba</option>
       <option value="photon">Photon</option>
       <option value="gurochan">Gurochan</option>
+      <option value="tomorrow">Tomorrow</option>
     </select>
   </label>
 </div>

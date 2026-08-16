@@ -5,6 +5,7 @@ import pytest
 
 from kareha.core.admin import (
     ban_ip,
+    check_admin_pass,
     create_admin_token,
     is_ip_banned,
     load_banned_ips,
@@ -73,6 +74,12 @@ def test_admin_token_roundtrip():
     cfg = _Cfg()
     token = create_admin_token(cfg, max_age=3600)
     assert verify_admin_token(token, cfg)
+
+
+def test_admin_pass_unequal_length_does_not_raise():
+    cfg = _Cfg()
+    assert check_admin_pass("short", cfg) is False
+    assert check_admin_pass("test-admin", cfg) is True
 
 
 def test_runtime_store_captcha_and_rate_limit(tmp_path):

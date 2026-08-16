@@ -135,12 +135,19 @@
       font-size: 10pt;
       text-decoration: none;
     }
+    .capcode,
+    .capcode.admin,
+    .postername.admin {
+      color: #e00000;
+      font-weight: bold;
+      font-size: 1.15em;
+    }
   </style>
 </head>
 <body>
 <p><a href="{{ script_root }}/">← Back to board</a></p>
 {% if subtitle %}<p style="text-align:center; color:#666; margin:-0.3em 0 0.5em 0; font-size:0.95em;">{{ subtitle }}</p>{% endif %}
-<h2>{{ thread.title or "Thread " ~ thread.thread }}</h2>
+<h2>{% if thread.pinned %}📌 {% endif %}{{ thread.title or "Thread " ~ thread.thread }}</h2>
 
 {% for p in thread.posts %}
   {% set post_no = p.num %}
@@ -172,12 +179,13 @@
 
   <div class="postInfo desktop">
     <a name="{{ post_no }}"></a>
+    {% if loop.first and thread.pinned %}<span class="pin-label" style="font-weight:bold;color:#00a;margin-right:4px;">📌 Pinned</span>{% endif %}
     {% if loop.first and thread.title %}
     <span class="subject">{{ thread.title }}</span>
     {% endif %}
     <label>
       <input type="checkbox" name="report" value="{{ thread.thread }},{{ p.num }}" form="report-form">
-      <span class="postername">{{ p.name }}</span>
+      <span class="postername{% if p.capcode or p.name == 'Admin' %} admin{% endif %}">{{ p.name }}</span>
       {% if p.capcode %}
         {{ p.capcode | safe }}
       {% elif p.trip %}
@@ -231,11 +239,19 @@
 <!-- Report form using the report checkboxes above -->
 <form id="report-form" method="post" action="{{ script_root }}/?task=report" style="margin-top: 12px;">
   <input type="hidden" name="thread" value="{{ thread.thread }}">
+  <input type="hidden" name="csrf" value="{{ csrf_token }}">
   <p>
     Report:
     <input type="text" name="reason" placeholder="Reason (required)" required style="width: 300px;">
     <button type="submit" title="Report selected posts">🚩</button>
   </p>
+  {% if enable_report_captcha %}
+  <p>
+    <img src="data:image/png;base64,{{ report_captcha_image }}" alt="captcha" style="vertical-align: middle; border: 1px solid #ccc; margin-right: 6px;">
+    <input type="text" name="captcha" size="8" required placeholder="captcha" autocomplete="off" style="vertical-align: middle;">
+    <input type="hidden" name="captcha_token" value="{{ report_captcha_token }}">
+  </p>
+  {% endif %}
   <small style="color:#666;">Check the boxes next to posts you want to report.</small>
 </form>
 
@@ -245,7 +261,7 @@
 </p>
 
 <!-- Theme Switcher - Bottom Right -->
-<div id="theme-switcher" style="position: fixed; bottom: 8px; right: 8px; background: #fff; border: 1px solid #888; padding: 4px 8px; font-size: 12px; z-index: 9999;">
+<div id="theme-switcher" style="position: fixed; bottom: 8px; right: 8px; padding: 4px 8px; font-size: 12px; z-index: 9999;">
   <label>Theme:
     <select id="theme-select" onchange="setTheme(this.value)">
       <option value="burichan">Burichan</option>
@@ -253,6 +269,7 @@
       <option value="futaba">Futaba</option>
       <option value="photon">Photon</option>
       <option value="gurochan">Gurochan</option>
+      <option value="tomorrow">Tomorrow</option>
     </select>
   </label>
 </div>

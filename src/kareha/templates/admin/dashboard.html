@@ -48,6 +48,7 @@
 <ul>
 {% for t in threads %}
   {% set status = [] %}
+  {% if t.pinned %}{% set _ = status.append("Pinned") %}{% endif %}
   {% if t.closed %}{% set _ = status.append("Closed") %}{% endif %}
   {% if t.permasage %}{% set _ = status.append("Permasaged") %}{% endif %}
   {% set status_str = status | join(" | ") or "Normal" %}
@@ -55,6 +56,13 @@
     <a href="{{ script_root }}/admin/thread/{{ t.thread }}">#{{ t.thread }} — {{ t.title or "Untitled" | e }}</a>
     ({{ t.postcount }} posts) - {{ status_str }}
     <span class="actions">
+      <form method="post" action="{{ script_root }}/admin">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="action" value="pin">
+        <input type="hidden" name="thread" value="{{ t.thread }}">
+        <input type="hidden" name="state" value="{{ 0 if t.pinned else 1 }}">
+        <button type="submit" class="linkish">{{ "Unpin" if t.pinned else "Pin" }}</button>
+      </form> |
       <form method="post" action="{{ script_root }}/admin">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="action" value="close">

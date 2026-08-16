@@ -312,6 +312,13 @@ h1 {
 #posts h3 .postertrip {
 	color: #228854;
 }
+.capcode,
+.capcode.admin,
+.postername.admin {
+  color: #e00000;
+  font-weight: bold;
+  font-size: 1.15em;
+}
 #posts .deletebutton {
 	font-size: small;
 	position: absolute;
@@ -408,4 +415,9 @@ h1 {
 
 .errorpage h1, .errorpage h2 {
 	text-align: center;
+}
+
+#theme-switcher {
+  background: #F0E0D6;
+  border: 1px solid #D9BFB7;
 }

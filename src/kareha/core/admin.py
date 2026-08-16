@@ -18,12 +18,12 @@ _DENY_FROM_RE = re.compile(r"^\s*Deny\s+from\s+(\S+)", re.I)
 
 
 def check_admin_pass(provided: str, cfg: Any) -> bool:
-    """Simple admin password check. Uses timing-safe comparison."""
-    import hmac
+    """Timing-safe admin password check (equal-length SHA-256 digests)."""
     admin_pass = getattr(cfg, "ADMIN_PASS", "CHANGEME") or ""
     provided = provided or ""
-    # Always compare same length to avoid early exit leaks (pad/truncate for safety)
-    return hmac.compare_digest(provided.encode("utf-8"), admin_pass.encode("utf-8"))
+    left = hashlib.sha256(provided.encode("utf-8")).digest()
+    right = hashlib.sha256(admin_pass.encode("utf-8")).digest()
+    return hmac.compare_digest(left, right)
 
 
 def get_all_threads_for_admin(board_dir: Path, cfg: Any) -> list[dict]:
@@ -39,8 +39,10 @@ def get_all_threads_for_admin(board_dir: Path, cfg: Any) -> list[dict]:
             "postcount": t.get("postcount", 0),
             "lasthit": t.get("lasthit", 0),
             "lastmod": t.get("lastmod", 0),
+            "created": t.get("created", 0),
             "closed": t.get("closed", False),
             "permasage": t.get("permasage", False),
+            "pinned": t.get("pinned", False),
         })
     return result
 
@@ -54,7 +56,7 @@ def moderate_thread_action(
 ) -> bool:
     """
     Perform moderation actions on a thread.
-    Supported actions: 'close', 'permasage'
+    Supported actions: 'close', 'permasage', 'pin'
     """
     res_dir = board_dir / getattr(cfg or {}, "RES_DIR", "res/")
     thread = load_thread(res_dir, thread_id)
@@ -65,6 +67,8 @@ def moderate_thread_action(
         thread.closed = bool(state)
     elif action == "permasage":
         thread.permasage = bool(state)
+    elif action == "pin":
+        thread.pinned = bool(state)
     else:
         return False
 

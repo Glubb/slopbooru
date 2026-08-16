@@ -53,13 +53,13 @@ FAVICON: str = "kareha.ico"
 # ---------------------------------------------------------------------------
 ALLOW_TEXT_THREADS: bool = True
 ALLOW_TEXT_REPLIES: bool = True
-AUTOCLOSE_POSTS: int = 0
-AUTOCLOSE_DAYS: int = 0
-AUTOCLOSE_SIZE: int = 0
+AUTOCLOSE_POSTS: int = 0      # close thread when reply count reaches this (0 = off)
+AUTOCLOSE_DAYS: int = 0       # close thread this many days after creation (0 = off)
+AUTOCLOSE_SIZE: int = 0       # close thread when its JSON is this many KB (0 = off)
 MAX_RES: int = 20
-MAX_THREADS: int = 0
-MAX_POSTS: int = 500
-MAX_MEGABYTES: int = 0
+MAX_THREADS: int = 0          # drop oldest listed threads beyond this (0 = unlimited)
+MAX_POSTS: int = 500          # hard cap: last reply then close (0 = unlimited)
+MAX_MEGABYTES: int = 0        # drop oldest threads when res+src+thumb exceed this (0 = off)
 MAX_FIELD_LENGTH: int = 100
 MAX_COMMENT_LENGTH: int = 8192
 MAX_LINES_SHOWN: int = 15
@@ -106,6 +106,7 @@ MAX_IMAGE_PIXELS: int = 50_000_000
 # Captcha (simplified modern implementation)
 # ---------------------------------------------------------------------------
 ENABLE_CAPTCHA: bool = False
+ENABLE_REPORT_CAPTCHA: bool = True   # captcha on /?task=report and thread report form
 CAPTCHA_HEIGHT: int = 18
 CAPTCHA_DIFFICULTY: float = 0.6   # 0.0 easy ... 1.0 hard (affects distortion/noise)
 CAPTCHA_EXPIRY_SECONDS: int = 180  # 3 minutes (shorter for better security vs 10min)
@@ -136,7 +137,7 @@ ERROR_LOG_FILE: str = "error.log"
 # Tweaks & features
 # ---------------------------------------------------------------------------
 CHARSET: str = "utf-8"
-TRIM_METHOD: int = 0
+TRIM_METHOD: int = 0        # 0 = drop least-recently-bumped; 1 = drop oldest by created time
 REQUIRE_THREAD_TITLE: bool = False
 DATE_STYLE: str = "futaba"          # futaba, 2ch, etc.
 
@@ -147,6 +148,9 @@ DATE_STYLE: str = "futaba"          # futaba, 2ch, etc.
 #   "disabled"  - hide reply form entirely
 #   "text_only" - show reply form but force no file upload (text comments only)
 BLOG_COMMENTS: str = "enabled"
+# How many latest comments to show under each entry on the blog front page.
+# 0 hides comments on the index (thread pages still have the full list).
+BLOG_FRONT_COMMENTS: int = 3
 DISPLAY_ID: str = ""                # '', 'ip', 'mask', 'thread', 'link' etc. (IP-based randomized IDs)
 EMAIL_ID: str = "Heaven"
 SILLY_ANONYMOUS: str = ""

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% if submitted %}Report submitted{% else %}Report post{% endif %} — {{ title | e }}</title>
+  <link rel="stylesheet" href="{{ script_root }}/css/{{ initial_theme_css }}">
+  <style>
+    body { margin: 2em auto; max-width: 560px; font-family: sans-serif; line-height: 1.5; }
+    h1 { font-size: 1.6em; margin: 0 0 0.3em; text-align: center; }
+    .sub { text-align: center; color: #666; margin: 0 0 1.2em; font-size: 0.95em; }
+    #reportform {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 12px 14px;
+      border: 1px solid #aaa;
+    }
+    #reportform p { margin: 0.6em 0; }
+    #reportform textarea { width: 100%; box-sizing: border-box; }
+    #reportform .captcha-row img {
+      vertical-align: middle;
+      border: 1px solid #ccc;
+      margin-right: 6px;
+    }
+    .error {
+      color: #c00;
+      background: #fff3f3;
+      border: 1px solid #e8b4b4;
+      padding: 8px 10px;
+      margin: 0 auto 12px;
+      max-width: 520px;
+    }
+    .ok {
+      background: #f3fff3;
+      border: 1px solid #b4e8b4;
+      padding: 12px 14px;
+      margin: 0 auto 12px;
+      max-width: 520px;
+    }
+    .actions { text-align: center; margin-top: 1.4em; }
+    .actions a { margin: 0 0.6em; }
+    button[type="submit"] { font-size: 14px; padding: 4px 12px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>{{ title }}</h1>
+  <p class="sub">{% if submitted %}Report received{% else %}Report a post{% endif %}</p>
+
+  {% if error %}
+  <p class="error"><strong>Error:</strong> {{ error | e }}</p>
+  {% endif %}
+
+  {% if submitted %}
+  <div class="ok">
+    <p>Report(s) submitted. Thank you.</p>
+  </div>
+  <p class="actions">
+    <a href="{{ script_root }}/">← Back to board</a>
+    {% if thread_id %}
+    <a href="{{ script_root }}/{{ thread_id }}/">Back to thread</a>
+    {% endif %}
+    <a href="#" onclick="window.close();return false;">Close window</a>
+  </p>
+  {% else %}
+  <form id="reportform" method="post" action="{{ script_root }}/?task=report">
+    <input type="hidden" name="thread" value="{{ thread_id }}">
+    <input type="hidden" name="post" value="{{ post_num }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <p>Reporting post <strong>No.{{ post_num }}</strong> in thread <strong>#{{ thread_id }}</strong></p>
+    <p>Reason for report:</p>
+    <p><textarea name="reason" rows="5" cols="50" required maxlength="2000" placeholder="Why should this post be removed?">{{ reason | e }}</textarea></p>
+    {% if enable_captcha %}
+    <p class="captcha-row">
+      <img src="data:image/png;base64,{{ captcha_image }}" alt="captcha">
+      <input type="text" name="captcha" size="8" required placeholder="captcha" autocomplete="off">
+      <input type="hidden" name="captcha_token" value="{{ captcha_token }}">
+    </p>
+    {% endif %}
+    <p><button type="submit">Submit report</button></p>
+  </form>
+  <p class="actions">
+    <a href="{{ script_root }}/">← Back to board</a>
+    {% if thread_id %}
+    <a href="{{ script_root }}/{{ thread_id }}/">Back to thread</a>
+    {% endif %}
+  </p>
+  {% endif %}
+</body>
+</html>

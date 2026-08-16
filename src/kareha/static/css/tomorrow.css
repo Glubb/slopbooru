@@ -1,0 +1,221 @@
+/* Tomorrow — dark imageboard theme (4chan-style layout, dark palette). */
+
+html, body {
+  background: #1d1f21;
+  color: #c5c8c6;
+  font-family: arial, helvetica, sans-serif;
+  font-size: 10pt;
+  margin: 8px;
+}
+
+h1, h2 {
+  color: #c5c8c6;
+  font-size: 1.5em;
+}
+
+a {
+  color: #81a2be;
+  text-decoration: none;
+}
+a:hover {
+  color: #5f89ac;
+}
+
+a.quotelink { color: #5f89ac; }
+a.quotelink:hover { color: #81a2be; }
+a.quotejs { color: inherit; text-decoration: none; }
+a.quotejs:hover { text-decoration: underline; }
+
+blockquote.unkfunc,
+.unkfunc {
+  color: #b5bd68;
+}
+
+.post {
+  margin-bottom: 4px;
+  padding: 2px 2px 2px 4px;
+  clear: both;
+}
+
+.post.op {
+  border: none;
+  background: none;
+}
+
+.post.reply {
+  background: #282a2e;
+  border: 1px solid #373b41;
+}
+
+.postContainer {
+  position: relative;
+  margin: 0;
+  padding: 0;
+}
+
+.postContainer.replyContainer {
+  margin-top: 2px;
+}
+
+.replacedSideArrows {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 16px;
+  text-align: center;
+  font-size: 10pt;
+  color: #707880;
+  cursor: pointer;
+  user-select: none;
+}
+.replacedSideArrows a {
+  color: #707880;
+  text-decoration: none;
+}
+
+.postContainer.replyContainer .post.reply {
+  display: table;
+  padding: 2px;
+  margin-left: 20px;
+}
+
+.postContainer.opContainer .post.op {
+  margin-left: 0;
+}
+
+.thread {
+  margin-bottom: 20px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #373b41;
+  clear: both;
+  overflow: hidden;
+}
+
+.postInfo {
+  color: #b294bb;
+  font-size: 9pt;
+  overflow: hidden;
+}
+
+.postername {
+  color: #b5bd68;
+  font-weight: bold;
+}
+
+.postertrip {
+  color: #8abeb7;
+}
+
+.subject {
+  color: #cc6666;
+  font-weight: bold;
+}
+
+.file {
+  float: left;
+  margin-right: 5px;
+  margin-bottom: 2px;
+}
+
+a.fileThumb {
+  display: inline-block;
+  text-decoration: none;
+}
+
+a.fileThumb img {
+  border: 1px solid #373b41;
+  max-width: 125px;
+  max-height: 125px;
+  vertical-align: middle;
+}
+
+a.fileThumb img.expanded,
+.fileThumb.expanded img {
+  max-width: none;
+  max-height: none;
+}
+
+.post.has-expanded-image .postInfo,
+.post.has-expanded-image .postMessage {
+  clear: both;
+}
+
+.fileText {
+  font-size: 9pt;
+  color: #969896;
+  display: block;
+  max-width: 140px;
+  word-break: break-all;
+  line-height: 1.1;
+}
+
+.thread .post.reply {
+  margin-left: 6px;
+  clear: both;
+}
+
+blockquote {
+  margin: 0;
+  padding: 0;
+}
+
+.omitted {
+  color: #969896;
+  font-style: italic;
+}
+
+form {
+  background: #282a2e;
+  border: 1px solid #373b41;
+  padding: 8px;
+}
+
+input, textarea, select, button {
+  font-size: 10pt;
+  background: #1d1f21;
+  color: #c5c8c6;
+  border: 1px solid #373b41;
+}
+
+button {
+  cursor: pointer;
+}
+
+#theme-switcher {
+  background: #282a2e;
+  border: 1px solid #373b41;
+  color: #c5c8c6;
+}
+
+.pin-label {
+  color: #de935f;
+}
+
+.pager a { color: #81a2be; }
+.pager strong { color: #c5c8c6; }
+
+.capcode,
+.capcode.admin,
+.postername.admin {
+  color: #ff5555;
+  font-weight: bold;
+  font-size: 1.15em;
+}
+
+.capcode.mod {
+  color: #81a2be;
+  font-weight: bold;
+  font-size: 1.15em;
+}
+
+.catalog-nav { color: #c5c8c6; }
+.catalog .thread { background: #282a2e; border-color: #373b41; }
+.blog-entry { border-color: #373b41; }
+.blog-title a { color: #81a2be; }
+.blog-date, .blog-meta { color: #969896; }
+
+.error, .message {
+  background: #3a2222;
+  border-color: #a54242;
+  color: #c5c8c6;
+}

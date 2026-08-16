@@ -71,6 +71,13 @@ a.quotelink {
 	background:inherit;
 	color:#228854;
 }
+.capcode,
+.capcode.admin,
+.postername.admin {
+  color: #e00000;
+  font-weight: bold;
+  font-size: 1.15em;
+}
 .oldpost {
   background:inherit;
   color:#0F0C5D;
@@ -179,4 +186,9 @@ a.quotejs:hover {
 
 .adminbar {
   text-align: center;
+}
+
+#theme-switcher {
+  background: #D0D5E0;
+  border: 1px solid #B7C5D9;
 }

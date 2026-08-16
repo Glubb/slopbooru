@@ -3,16 +3,15 @@ Admin moderation action dispatcher (POST-only).
 """
 from __future__ import annotations
 
-import time
 from pathlib import Path
 from typing import Any
 
-from .core.admin import admin_delete_post, ban_md5, moderate_thread_action
+from .core.admin import admin_delete_post, ban_ip, ban_md5, moderate_thread_action
 from .core.reports import update_report_status
 from .core.storage import load_thread, save_thread
 
 ALLOWED_ACTIONS = frozenset({
-    "close", "permasage", "delete", "deletefile", "banmd5", "report_handled",
+    "close", "permasage", "pin", "delete", "deletefile", "banmd5", "report_handled",
 })
 
 
@@ -33,7 +32,7 @@ def process_admin_action(
     if action not in ALLOWED_ACTIONS:
         return False, "Unknown action"
 
-    if action in ("close", "permasage"):
+    if action in ("close", "permasage", "pin"):
         if not thread_id_str:
             return False, "Missing thread"
         try:
@@ -101,3 +100,50 @@ def process_admin_action(
         return True, ""
 
     return False, "Unhandled action"
+
+
+def process_mass_action(
+    board_dir: Path,
+    cfg: Any,
+    thread_id: int,
+    mass_action: str,
+    selected_nums: list[int],
+) -> tuple[bool, str]:
+    """
+    Apply a checkbox mass action. Each sub-action persists itself.
+
+    Do not save a pre-loaded Thread afterwards — that would revert deletes.
+    """
+    if not selected_nums:
+        return False, "No posts selected"
+
+    res_dir = board_dir / getattr(cfg, "RES_DIR", "res/")
+    thread = load_thread(res_dir, thread_id)
+    if not thread:
+        return False, "Thread not found"
+
+    posts_to_act = [p for p in thread.posts if p.num in selected_nums]
+    if not posts_to_act:
+        return False, "No matching posts"
+
+    if mass_action == "delete_posts":
+        for p in posts_to_act:
+            admin_delete_post(board_dir, thread_id, p.num, file_only=False, cfg=cfg)
+    elif mass_action == "delete_files":
+        for p in posts_to_act:
+            admin_delete_post(board_dir, thread_id, p.num, file_only=True, cfg=cfg)
+    elif mass_action == "ban_ips":
+        unique_ips = {p.ip for p in posts_to_act if p.ip}
+        for ip_addr in unique_ips:
+            ban_ip(board_dir, ip_addr, reason=f"Mass ban from mod page thread {thread_id}", cfg=cfg)
+    elif mass_action == "ban_md5s":
+        for p in posts_to_act:
+            if p.md5:
+                ban_md5(
+                    board_dir, p.md5,
+                    reason=f"Mass ban from mod page thread {thread_id}", cfg=cfg,
+                )
+                admin_delete_post(board_dir, thread_id, p.num, file_only=True, cfg=cfg)
+    else:
+        return False, "Unknown mass action"
+    return True, ""

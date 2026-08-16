@@ -11,6 +11,7 @@ __pycache__/
 # Local test / development board instances
 blogboard/
 testboard/
+myboard/
 venv/
 env/
 ENV/

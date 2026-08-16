@@ -35,6 +35,7 @@ SECRET = "put a long random string here - at least 32 chars, never reuse"
 # BLOG_COMMENTS = "enabled"    # default — visitors can comment on entries (reply form on thread pages)
 # BLOG_COMMENTS = "disabled"   # hide comment forms; only admins post new entries
 # BLOG_COMMENTS = "text_only"  # comments allowed but no image/file uploads on replies
+# BLOG_FRONT_COMMENTS = 3      # latest comments shown under each entry on the blog index (0 = hide)
 #
 # The explicit --mode flag to `kareha serve` (or mode= to make_app) always wins
 # over the value in this file. Aliases are accepted in either location.
@@ -43,3 +44,5 @@ SECRET = "put a long random string here - at least 32 chars, never reuse"
 # TRUSTED_PROXY_COUNT = 1
 
 # Optional: ENABLE_CAPTCHA = True  (works across gunicorn workers via .runtime/)
+# Report form always uses a captcha by default (separate from posting):
+# ENABLE_REPORT_CAPTCHA = True

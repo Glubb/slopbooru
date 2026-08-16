@@ -7,6 +7,7 @@ from .storage import (
     save_thread,
     list_threads,
     delete_thread,
+    allocate_post_num,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "save_thread",
     "list_threads",
     "delete_thread",
+    "allocate_post_num",
 ]

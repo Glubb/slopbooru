@@ -109,6 +109,13 @@ a:hover {
 .postertrip {
 	color:#FF3300;
 }
+.capcode,
+.capcode.admin,
+.postername.admin {
+  color: #e00000;
+  font-weight: bold;
+  font-size: 1.15em;
+}
 .oldpost {
         color:#CC1105;
         font-weight:bold;

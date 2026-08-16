@@ -133,6 +133,14 @@ a.quotejs:hover { text-decoration: underline; }
   color: #228854;
 }
 
+.capcode,
+.capcode.admin,
+.postername.admin {
+  color: #e00000;
+  font-weight: bold;
+  font-size: 1.15em;
+}
+
 .file {
   float: left;
   margin-right: 5px;   /* tighter gap between thumb+filetext and the post text, closer to real 4chan */
