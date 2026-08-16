@@ -99,7 +99,7 @@ a.quotejs:hover { text-decoration: underline; }
   margin-left: 20px;
 }
 
-.postContainer.replyContainer .post.reply .fileThumb {
+.postContainer.replyContainer .post.reply .file {
   margin-left: 20px;
   margin-right: 20px;
   margin-top: 3px;
@@ -149,21 +149,21 @@ a.quotejs:hover { text-decoration: underline; }
 
 a.fileThumb {
   display: inline-block;
+  padding: 0;
+  margin: 0;
+  line-height: 0;
+  cursor: zoom-in;
   text-decoration: none;
 }
-
+a.fileThumb.expanded { cursor: zoom-out; }
 a.fileThumb img {
-  border: 1px solid #800000;
-  max-width: 125px;
-  max-height: 125px;
-  vertical-align: middle;
+  display: block;
+  max-width: 200px;
+  height: auto;
 }
-
-a.fileThumb img.expanded,
-.fileThumb.expanded img {
+a.fileThumb img.expanded {
   max-width: none;
   max-height: none;
-  /* natural/full size when expanded; user scrolls page if needed */
 }
 
 .post.has-expanded-image .postInfo,

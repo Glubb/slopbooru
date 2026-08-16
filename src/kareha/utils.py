@@ -324,7 +324,8 @@ def seed_board_static_assets(board_dir: Path) -> None:
 
     js_src = pkg_static / "kareha.js"
     js_dst = board_dir / "kareha.js"
-    if js_src.is_file() and not js_dst.exists():
+    # Always refresh board JS — it is application code, not a user override.
+    if js_src.is_file():
         shutil.copy(js_src, js_dst)
 
 

@@ -12,11 +12,24 @@
       text-align: center;
     }
 
-    /* Center the new post form */
+    /* Center the new post form; keep fields inside the themed border */
     #postform {
       max-width: 600px;
       margin: 0 auto 20px auto;
       text-align: left;
+      box-sizing: border-box;
+    }
+    #postform textarea,
+    #postform input[type="text"],
+    #postform input[type="password"],
+    #postform input[name="title"],
+    #postform input[name="field_a"],
+    #postform input[name="field_b"] {
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    #postform textarea {
+      width: 100%;
     }
 
     /* Visual separation between threads (OP posts) */
@@ -87,7 +100,7 @@
       margin-left: 20px;
     }
 
-    .postContainer.replyContainer .post.reply .fileThumb {
+    .postContainer.replyContainer .post.reply .file {
       margin-left: 20px;
       margin-right: 20px;
       margin-top: 3px;
@@ -100,15 +113,23 @@
       background: none;
     }
 
-    a.fileThumb img.expanded,
-    .fileThumb.expanded img {
+    a.fileThumb {
+      display: inline-block;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      line-height: 0;
+      cursor: zoom-in;
+    }
+    a.fileThumb.expanded { cursor: zoom-out; }
+    a.fileThumb img {
+      display: block;
+      max-width: 200px;
+      height: auto;
+    }
+    a.fileThumb img.expanded {
       max-width: none;
       max-height: none;
-    }
-
-    .post.has-expanded-image .postInfo,
-    .post.has-expanded-image .postMessage {
-      clear: both;
     }
 
     .subject {
@@ -179,7 +200,7 @@
     <p>Subject: <input name="title" required></p>
   {% endif %}
   <p>Del. pass: <input type="password" name="password" size="10" value="{{ default_delpass }}" placeholder="8-char auto-generated (cookie)"></p>
-  <p><textarea name="comment" rows="6" cols="70" placeholder="Comment"></textarea></p>
+  <p><textarea name="comment" rows="6" cols="48" placeholder="Comment"></textarea></p>
   {% if allow_images %}
     <p>File: <input type="file" name="file"></p>
   {% endif %}
@@ -209,8 +230,8 @@
           </span>
           <br>
           {% if t.op.thumbnail %}
-            <a class="fileThumb" href="{{ script_root }}/{{ t.op.image }}" target="_blank">
-              <img class="fileThumb" src="{{ script_root }}/{{ t.op.thumbnail }}" alt="{{ t.op.size }} B">
+            <a class="fileThumb" href="{{ script_root }}/{{ t.op.image }}" onclick="return expandThumb(event, this);">
+              <img src="{{ script_root }}/{{ t.op.thumbnail }}" alt="">
             </a>
           {% endif %}
         </div>
@@ -262,8 +283,8 @@
           </span>
           <br>
           {% if r.thumbnail %}
-            <a class="fileThumb" href="{{ script_root }}/{{ r.image }}" target="_blank">
-              <img class="fileThumb" src="{{ script_root }}/{{ r.thumbnail }}" alt="{{ r.size }} B" style="max-width:125px; max-height:125px;">
+            <a class="fileThumb" href="{{ script_root }}/{{ r.image }}" onclick="return expandThumb(event, this);">
+              <img src="{{ script_root }}/{{ r.thumbnail }}" alt="">
             </a>
           {% endif %}
         </div>
@@ -326,7 +347,7 @@
   </label>
 </div>
 
-<script src="{{ script_root }}/kareha.js"></script>
+<script src="{{ script_root }}/kareha.js?v=7"></script>
 <script>
 function setTheme(theme) {
     const link = document.getElementById('theme-stylesheet');

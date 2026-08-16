@@ -265,7 +265,9 @@ def post_stuff(
                 max_w = getattr(cfg, "MAX_W", 200)
                 max_h = getattr(cfg, "MAX_H", 200)
                 quality = getattr(cfg, "THUMBNAIL_QUALITY", 85)
-                thumb_success = make_thumbnail(final_image, final_thumb, max_w, max_h, quality)
+                thumb_success, tn_w, tn_h = make_thumbnail(
+                    final_image, final_thumb, max_w, max_h, quality
+                )
 
                 if thumb_success:
                     try:
@@ -283,6 +285,8 @@ def post_stuff(
                     "size": final_image.stat().st_size,
                     "width": width,
                     "height": height,
+                    "tn_width": tn_w,
+                    "tn_height": tn_h,
                     "md5": md5 or "",
                 }
 

@@ -78,11 +78,11 @@ def make_thumbnail(
     max_h: int,
     quality: int = 85,
     force_jpeg: bool = True,
-) -> bool:
+) -> tuple[bool, int, int]:
     """
     Create a thumbnail using Pillow.
 
-    Returns True on success.
+    Returns (ok, thumb_width, thumb_height).
     """
     try:
         with Image.open(src_path) as im:
@@ -99,6 +99,7 @@ def make_thumbnail(
                 im = im.convert("RGB")
 
             im.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
+            tw, th = im.size
 
             dst = Path(dst_path)
             dst.parent.mkdir(parents=True, exist_ok=True)
@@ -108,9 +109,9 @@ def make_thumbnail(
             else:
                 im.save(dst)
 
-        return True
+        return True, tw, th
     except Exception:
-        return False
+        return False, 0, 0
 
 
 def compute_md5(file_path: str | Path) -> Optional[str]:

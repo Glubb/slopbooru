@@ -18,11 +18,23 @@
       margin: 0.3em 0 0.8em 0;
     }
 
-    /* Center the reply form */
+    /* Center the reply form; keep fields inside the themed border */
     #replyform {
       max-width: 600px;
       margin: 20px auto;
       text-align: left;
+      box-sizing: border-box;
+    }
+    #replyform textarea,
+    #replyform input[type="text"],
+    #replyform input[type="password"],
+    #replyform input[name="field_a"],
+    #replyform input[name="field_b"] {
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    #replyform textarea {
+      width: 100%;
     }
 
     /* 4chan postContainer + replacedSideArrows (to match the pasted real HTML exactly) */
@@ -49,7 +61,7 @@
       margin-left: 20px;
     }
 
-    .postContainer.replyContainer .post.reply .fileThumb {
+    .postContainer.replyContainer .post.reply .file {
       margin-left: 20px;
       margin-right: 20px;
       margin-top: 3px;
@@ -78,25 +90,22 @@
     }
     .post a.fileThumb {
       display: inline-block;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      line-height: 0;
+      cursor: zoom-in;
       text-decoration: none;
     }
-
+    .post a.fileThumb.expanded { cursor: zoom-out; }
     .post a.fileThumb img {
-      border: 1px solid #800000;
-      max-width: 125px;
-      max-height: 125px;
-      vertical-align: middle;
+      display: block;
+      max-width: 200px;
+      height: auto;
     }
-
-    .post a.fileThumb img.expanded,
-    .fileThumb.expanded img {
+    .post a.fileThumb img.expanded {
       max-width: none;
       max-height: none;
-    }
-
-    .post.has-expanded-image .postInfo,
-    .post.has-expanded-image .postMessage {
-      clear: both;
     }
 
     .subject {
@@ -170,8 +179,8 @@
       </span>
       <br>
       {% if p.thumbnail %}
-        <a class="fileThumb" href="{{ script_root }}/{{ p.image }}" target="_blank">
-          <img class="fileThumb" src="{{ script_root }}/{{ p.thumbnail }}" alt="{{ p.size }} B">
+        <a class="fileThumb" href="{{ script_root }}/{{ p.image }}" onclick="return expandThumb(event, this);">
+          <img src="{{ script_root }}/{{ p.thumbnail }}" alt="">
         </a>
       {% endif %}
     </div>
@@ -223,7 +232,7 @@
 
   <p>Name: <input name="field_a" value="{{ 'Admin' if is_admin and mode == 'blog' else '' }}"> Link: <input name="field_b"></p>
   <p>Del. pass: <input type="password" name="password" size="10" value="{{ default_delpass }}" placeholder="for later deletion"></p>
-  <p><textarea name="comment" rows="5" cols="60"></textarea></p>
+  <p><textarea name="comment" rows="5" cols="48"></textarea></p>
   {% if allow_images %}<p>File: <input type="file" name="file"></p>{% endif %}
   {% if enable_captcha %}
   <p>
@@ -274,7 +283,7 @@
   </label>
 </div>
 
-<script src="{{ script_root }}/kareha.js"></script>
+<script src="{{ script_root }}/kareha.js?v=7"></script>
 <script>
 function setTheme(theme) {
     const link = document.getElementById('theme-stylesheet');

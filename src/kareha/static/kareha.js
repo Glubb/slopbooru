@@ -275,66 +275,33 @@ if(style_cookie)
 
 var captcha_key=make_password();
 
-/* Image expansion - click thumbnail to expand in place, click again to shrink.
-   Matches 4chan behavior: left click toggles expand (prevents nav), ctrl/middle/shift opens full in tab.
-   The image *itself* receives the click for expansion (the <img> is the primary target).
-*/
-function expand_image(link) {
-  var img = link;
-  if (link && link.tagName && link.tagName.toLowerCase() === 'img') {
-    // called with img directly: find containing link for .href if present
-    img = link;
-    var parentLink = link.closest ? link.closest('a[href]') : link.parentNode;
-    if (parentLink && parentLink.href) link = parentLink;
-  } else {
-    img = link ? link.querySelector('img') : null;
-  }
-  if (!img) return;
-  var post = (link && link.closest) ? link.closest('.post') : (img.closest ? img.closest('.post') : null);
-  if (img.classList.contains('expanded')) {
-    // shrink
-    if (img.dataset.origSrc) img.src = img.dataset.origSrc;
-    if (img.dataset.origWidth) img.style.width = img.dataset.origWidth;
-    if (img.dataset.origHeight) img.style.height = img.dataset.origHeight;
-    img.classList.remove('expanded');
-    if (post) post.classList.remove('has-expanded-image');
-  } else {
-    img.dataset.origSrc = img.src;
-    img.dataset.origWidth = img.style.width || img.width + 'px';
-    img.dataset.origHeight = img.style.height || img.height + 'px';
-    // Prefer link.href for the full-size URL (the semantic link around the thumb)
-    var fullUrl = (link && link.href) ? link.href : (img.dataset.full || img.src);
-    img.src = fullUrl;
-    img.style.width = '';
-    img.style.height = '';
-    img.classList.add('expanded');
-    if (post) post.classList.add('has-expanded-image');
-  }
+/* Thumb is just <a href=original><img src=thumbnail></a>.
+   The <a> has no fixed size — it is whatever the <img> is.
+   Left-click swaps the img to the original; click again restores the thumb. */
+function expandThumb(ev, a) {
+	ev = ev || window.event;
+	if (!a) return true;
+	if (ev.which === 2 || ev.button === 1 || ev.ctrlKey || ev.metaKey) return true;
+	if (ev.preventDefault) ev.preventDefault();
+
+	var img = a.querySelector('img');
+	if (!img) return false;
+	var post = a.closest ? a.closest('.post') : null;
+
+	if (img.classList.contains('expanded')) {
+		img.src = img.getAttribute('data-thumb') || img.src;
+		img.classList.remove('expanded');
+		a.classList.remove('expanded');
+		if (post) post.classList.remove('has-expanded-image');
+	} else {
+		if (!img.getAttribute('data-thumb')) img.setAttribute('data-thumb', img.src);
+		img.src = a.href;
+		img.classList.add('expanded');
+		a.classList.add('expanded');
+		if (post) post.classList.add('has-expanded-image');
+	}
+	return false;
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-  // Attach directly to the thumbnail *images* themselves so the image is the link/target for expansion.
-  // We still use the wrapping <a class="fileThumb" href="full"> for right-click/save and modifier behavior.
-  var thumbImgs = document.querySelectorAll('.file a[href] img, a.fileThumb img, img.fileThumb');
-  for (var i = 0; i < thumbImgs.length; i++) {
-    var img = thumbImgs[i];
-    img.addEventListener('click', function(ev) {
-      // Find the containing link (for href + to pass to expand_image)
-      var link = this.closest ? this.closest('a[href]') : this.parentNode;
-      if (!link || !link.href) link = this; // fallback (rare)
-      // allow open in new tab etc with modifiers or middle click
-      if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.which === 2) {
-        return; // let browser default (target=_blank will open tab)
-      }
-      ev.preventDefault();
-      expand_image(link);
-    });
-  }
-});
-
-/* Also add CSS rule via JS if needed, but better in stylesheet.
-   For expanded images, remove max size constraints.
-*/
 
 /* Quote / reply button: clicking a post number (or .quotejs) inserts >>num into the comment textarea.
    Matches vichan/4chan behavior. */
