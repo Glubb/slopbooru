@@ -8,6 +8,20 @@ __pycache__/
 *$py.class
 .Python
 
+# Original Perl Kareha (reference only — not this Python port)
+# Safe to drop a 3.1.4 extract or zip at the repo root.
+/kareha/
+/kareha.pl
+/admin.pl
+/captcha.pl
+/wakautils.pl
+/sjis.pl
+/config.pl
+/kareha_3.1.4/
+/kareha_3.1.4.zip
+/original-kareha/
+/kareha-orig/
+
 # Local test / development board instances
 blogboard/
 testboard/
