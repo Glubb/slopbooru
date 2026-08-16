@@ -2,6 +2,8 @@
 
 A pragmatic Python 3 rewrite of the classic Kareha image/message board software (originally Perl).
 
+**This is vibecoded.** Built by prompting an AI and iterating until it worked. Treat it like a hobby port, not a sacred text.
+
 ## Current Status
 
 **The project is in a usable state.** You can create boards, post threads and replies (with images in image mode), view them, and do basic deletion. Production hardening includes POST-only deletion/admin actions, enforced IP bans, multi-worker captcha/rate limits, and Caddy-ready reverse proxy support.
@@ -149,5 +151,6 @@ This repo contains both the **Python package** and **example board scaffolding**
 - Storage uses per-thread JSON files (easy to inspect/backup).
 - No legacy Perl encrypted logs are read.
 - This is a from-scratch pragmatic port, not a line-by-line translation.
+- Vibecoded: expect sharp edges, file-based storage, and the occasional "why is it like that."
 
 Original Kareha by the Wakaba/Kareha authors. This port aims to keep the spirit alive in modern Python.
