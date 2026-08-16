@@ -109,6 +109,7 @@ blockquote.unkfunc,
 .subject {
   color: #cc6666;
   font-weight: bold;
+  font-size: 1.35em;
 }
 
 .file {
@@ -195,13 +196,13 @@ button {
 .postername.admin {
   color: #ff5555;
   font-weight: bold;
-  font-size: 1.15em;
+  font-size: inherit;
 }
 
 .capcode.mod {
   color: #81a2be;
   font-weight: bold;
-  font-size: 1.15em;
+  font-size: inherit;
 }
 
 .catalog-nav { color: #c5c8c6; }

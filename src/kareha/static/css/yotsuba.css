@@ -133,12 +133,17 @@ a.quotejs:hover { text-decoration: underline; }
   color: #228854;
 }
 
+.subject {
+  color: #cc1105;
+  font-weight: bold;
+  font-size: 1.35em;
+}
 .capcode,
 .capcode.admin,
 .postername.admin {
   color: #e00000;
   font-weight: bold;
-  font-size: 1.15em;
+  font-size: inherit;
 }
 
 .file {

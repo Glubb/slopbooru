@@ -110,12 +110,16 @@ a:hover {
 .postertrip {
   color: #228854;
 }
+.subject {
+  font-weight: bold;
+  font-size: 1.35em;
+}
 .capcode,
 .capcode.admin,
 .postername.admin {
   color: #e00000;
   font-weight: bold;
-  font-size: 1.15em;
+  font-size: inherit;
 }
 .omitted {
   color: #707070;

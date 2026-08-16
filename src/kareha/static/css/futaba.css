@@ -317,7 +317,7 @@ h1 {
 .postername.admin {
   color: #e00000;
   font-weight: bold;
-  font-size: 1.15em;
+  font-size: inherit;
 }
 #posts .deletebutton {
 	font-size: small;
